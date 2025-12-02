@@ -10,6 +10,7 @@ const login = async (email, password) => {
   if (response.data.token) {
     localStorage.setItem('token', response.data.token);
     localStorage.setItem('user', JSON.stringify(response.data));
+    console.log(response.data.token);
   }
   return response.data;
 };
