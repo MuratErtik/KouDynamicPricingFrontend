@@ -47,9 +47,9 @@ const SearchResultsPage = () => {
                   <span className="text-lg font-bold text-gray-800">--:--</span>
                 </div>
                 <div className="flex gap-4 text-gray-500 text-sm">
-                  <span>{flight.departureCity}</span>
+                  <span>{flight.departureAirport?.city}</span>
                   <ArrowRight size={16} />
-                  <span>{flight.arrivalCity}</span>
+                  <span>{flight.arrivalAirport?.city}</span>
                 </div>
               </div>
               
