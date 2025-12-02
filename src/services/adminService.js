@@ -15,6 +15,19 @@ const getAllFlights = async () => {
   return response.data;
 };
 
+// 2. Gelişmiş Arama (YENİ EKLENDİ)
+const searchFlights = async (searchParams) => {
+  // Boş veya null olan parametreleri temizle (URL kirliliğini önler)
+  const cleanParams = Object.fromEntries(
+    Object.entries(searchParams).filter(([_, v]) => v != null && v !== "")
+  );
+
+  const response = await api.get(`${BASE_URL}/search`, {
+    params: cleanParams,
+  });
+  return response.data;
+};
+
 // 2. Yeni Uçuş Ekle
 // Backend: @PostMapping("/add") -> URL sonuna /add eklendi
 const createFlight = async (flightData) => {
@@ -48,6 +61,7 @@ const getFlightById = async (id) => {
 export default {
   getAllFlights,
   createFlight,
+  searchFlights, // <--- Export etmeyi unutma
   deleteFlight,
   updateFlight,
   getFlightById
