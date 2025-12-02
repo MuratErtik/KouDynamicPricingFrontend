@@ -1,7 +1,7 @@
 import api from './api';
 
 const getAirports = async () => {
-  const response = await api.get('/public/airports');
+  const response = await api.get('/public/airport/get-all');
   return response.data;
 };
 
