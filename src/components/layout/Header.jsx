@@ -1,16 +1,10 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Plane, User, LogOut } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext'; // Hook'u import ettik
 
 const Header = () => {
-  const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user'));
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
+  const { user, logout } = useAuth(); // Context'ten verileri çek
 
   return (
     <header className="bg-blue-600 text-white shadow-md">
@@ -24,6 +18,7 @@ const Header = () => {
         {/* Navigation */}
         <nav className="flex items-center gap-6">
           {!user ? (
+            // Giriş Yapmamış Kullanıcı
             <>
               <Link to="/login" className="hover:text-blue-200 font-medium">Giriş Yap</Link>
               <Link 
@@ -34,13 +29,23 @@ const Header = () => {
               </Link>
             </>
           ) : (
+            // Giriş Yapmış Kullanıcı
             <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 font-medium">
                 <User size={18} />
-                Merhaba, {user.name}
+                {/* İsim Context'ten geliyor */}
+                Merhaba, {user.name} 
               </span>
+              
+              {/* Admin Linki (Sadece Adminlere) */}
+              {user.role === 'ROLE_ADMIN' && (
+                <Link to="/admin/dashboard" className="text-sm bg-blue-700 px-3 py-1 rounded hover:bg-blue-800">
+                  Yönetim Paneli
+                </Link>
+              )}
+
               <button 
-                onClick={handleLogout} 
+                onClick={logout} 
                 className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 transition"
               >
                 <LogOut size={16} /> Çıkış
