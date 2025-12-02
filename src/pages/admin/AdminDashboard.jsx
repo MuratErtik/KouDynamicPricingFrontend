@@ -12,21 +12,48 @@ import {
   PlaneLanding,
   Calendar,
   Clock,
-  Users 
+  Users,
+  Edit,
+  X,
+  Save,
+  Search,       // <--- YENİ EKLENDİ
+  Filter,       // <--- YENİ EKLENDİ
+  RotateCcw     // <--- YENİ EKLENDİ
 } from "lucide-react";
 
 const AdminDashboard = () => {
   const [flights, setFlights] = useState([]);
   const [airports, setAirports] = useState([]);
   
-  // Pagination State'leri
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  // --- SEARCH / FILTER STATE (YENİ) ---
+  const [showFilter, setShowFilter] = useState(false); // Paneli aç/kapa
+  const [searchParams, setSearchParams] = useState({
+    departureCity: "",
+    arrivalCity: "",
+    departureTimeStart: "",
+    departureTimeEnd: "",
+    basePriceMin: "",
+    basePriceMax: "",
+    status: "",
+    onlyFutureFlights: false
+  });
+
+  // Create Form State
   const [newFlight, setNewFlight] = useState({
     departureAirportId: "",
     arrivalAirportId: "",
     departureTime: "",
+  });
+
+  // --- UPDATE MODAL STATE ---
+  const [editingFlight, setEditingFlight] = useState(null); 
+  const [updateForm, setUpdateForm] = useState({
+    newDepartureTime: "",
+    status: "SCHEDULED"
   });
 
   useEffect(() => {
@@ -48,6 +75,45 @@ const AdminDashboard = () => {
     }
   };
 
+  // --- SEARCH FONKSİYONLARI (YENİ) ---
+  const handleSearchChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setSearchParams(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleSearchSubmit = async (e) => {
+    e.preventDefault();
+    try {
+        const results = await adminService.searchFlights(searchParams);
+        // Gelen sonuçları tarihe göre sırala
+        const sortedResults = results.sort((a, b) => new Date(b.departureTime) - new Date(a.departureTime));
+        setFlights(sortedResults);
+        setCurrentPage(1); // Arama yapınca 1. sayfaya dön
+        toast.info(`${results.length} uçuş bulundu.`);
+    } catch (error) {
+        console.error(error);
+        toast.error("Arama sırasında hata oluştu.");
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchParams({
+        departureCity: "",
+        arrivalCity: "",
+        departureTimeStart: "",
+        departureTimeEnd: "",
+        basePriceMin: "",
+        basePriceMax: "",
+        status: "",
+        onlyFutureFlights: false
+    });
+    loadData(); // Tüm verileri geri yükle
+  };
+
+  // --- CRUD İŞLEMLERİ ---
   const handleDelete = async (id) => {
     if (window.confirm("Bu uçuşu silmek istediğinize emin misiniz?")) {
       try {
@@ -67,7 +133,6 @@ const AdminDashboard = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    // Ekstra güvenlik kontrolü (UI engellese bile)
     if (newFlight.departureAirportId === newFlight.arrivalAirportId) {
       toast.warning("Kalkış ve Varış noktası aynı olamaz!");
       return;
@@ -86,7 +151,28 @@ const AdminDashboard = () => {
     }
   };
 
-  // --- YARDIMCI: Tarih Formatlama ---
+  const handleEditClick = (flight) => {
+    setEditingFlight(flight);
+    setUpdateForm({
+      newDepartureTime: flight.departureTime.slice(0, 16), 
+      status: flight.status
+    });
+  };
+
+  const handleUpdateSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await adminService.updateFlight(editingFlight.id, updateForm);
+      toast.success("Uçuş güncellendi!");
+      setEditingFlight(null);
+      loadData();
+    } catch (error) {
+      console.error(error);
+      toast.error("Güncelleme başarısız.");
+    }
+  };
+
+  // --- YARDIMCI FONKSİYONLAR ---
   const formatDate = (dateString) => {
     if (!dateString) return { time: "--:--", date: "Tarih Yok" };
     const date = new Date(dateString);
@@ -104,7 +190,9 @@ const AdminDashboard = () => {
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
-    <div className="container mx-auto p-6 min-h-screen bg-gray-50/50">
+    <div className="container mx-auto p-6 min-h-screen bg-gray-50/50 relative">
+      
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-blue-900 flex items-center gap-3">
           <Plane className="text-blue-600" /> Uçuş Yönetim Paneli
@@ -114,15 +202,14 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* --- YENİ UÇUŞ EKLEME KARTI --- */}
-      <div className="bg-white p-8 rounded-xl shadow-lg mb-10 border border-blue-100 relative overflow-hidden">
+      {/* --- CREATE FORM --- */}
+      <div className="bg-white p-8 rounded-xl shadow-lg mb-8 border border-blue-100 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
         <h2 className="text-xl font-bold mb-6 text-gray-800 flex items-center gap-2">
            <Plus className="bg-blue-100 text-blue-600 rounded-full p-1" size={24}/> Yeni Uçuş Planla
         </h2>
         
         <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-7 gap-6 items-end">
-          {/* NEREDEN SELECT */}
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nereden</label>
             <div className="relative">
@@ -136,7 +223,6 @@ const AdminDashboard = () => {
                     required
                 >
                     <option value="">Havalimanı Seçiniz</option>
-                    {/* FİLTRELEME: Nereye kısmında seçili olan ID burada gözükmesin */}
                     {airports
                         .filter(a => a.id.toString() !== newFlight.arrivalAirportId)
                         .map((a) => (
@@ -146,7 +232,6 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* NEREYE SELECT */}
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nereye</label>
             <div className="relative">
@@ -160,7 +245,6 @@ const AdminDashboard = () => {
                     required
                 >
                     <option value="">Havalimanı Seçiniz</option>
-                    {/* FİLTRELEME: Nereden kısmında seçili olan ID burada gözükmesin */}
                     {airports
                         .filter(a => a.id.toString() !== newFlight.departureAirportId)
                         .map((a) => (
@@ -192,7 +276,86 @@ const AdminDashboard = () => {
         </form>
       </div>
 
-      {/* --- TABLO --- */}
+      {/* --- ADVANCED SEARCH FILTER (YENİ KISIM) --- */}
+      <div className="mb-6">
+        <button 
+            onClick={() => setShowFilter(!showFilter)}
+            className="flex items-center gap-2 text-sm font-bold text-gray-600 bg-white border px-4 py-2 rounded-lg hover:bg-gray-50 transition shadow-sm mb-4"
+        >
+            <Filter size={16} /> Detaylı Arama / Filtrele {showFilter ? '▲' : '▼'}
+        </button>
+
+        {showFilter && (
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 animate-in fade-in slide-in-from-top-2">
+                <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    
+                    {/* Şehir Aramaları */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Kalkış Şehri</label>
+                        <input type="text" name="departureCity" value={searchParams.departureCity} onChange={handleSearchChange} placeholder="Örn: Istanbul" className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Varış Şehri</label>
+                        <input type="text" name="arrivalCity" value={searchParams.arrivalCity} onChange={handleSearchChange} placeholder="Örn: London" className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+
+                    {/* Tarih Aralığı */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Uçuş Tarihi</label>
+                        <input type="datetime-local" name="departureTimeStart" value={searchParams.departureTimeStart} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+
+
+                    {/* Fiyat Aralığı */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Min Fiyat ($)</label>
+                        <input type="number" name="basePriceMin" value={searchParams.basePriceMin} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Max Fiyat ($)</label>
+                        <input type="number" name="basePriceMax" value={searchParams.basePriceMax} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                    </div>
+
+                    {/* Durum */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Durum</label>
+                        <select name="status" value={searchParams.status} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="">Tümü</option>
+                            <option value="SCHEDULED">SCHEDULED</option>
+                            <option value="DELAYED">DELAYED</option>
+                            <option value="CANCELLED">CANCELLED</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                        </select>
+                    </div>
+
+                    {/* Gelecek Uçuşlar Checkbox */}
+                    <div className="flex items-center gap-2 mt-4 md:mt-6">
+                        <input 
+                            type="checkbox" 
+                            name="onlyFutureFlights" 
+                            id="future"
+                            checked={searchParams.onlyFutureFlights} 
+                            onChange={handleSearchChange} 
+                            className="w-4 h-4 text-blue-600 rounded cursor-pointer" 
+                        />
+                        <label htmlFor="future" className="text-sm text-gray-700 cursor-pointer">Sadece Gelecek Uçuşlar</label>
+                    </div>
+
+                    {/* Butonlar */}
+                    <div className="md:col-span-4 flex justify-end gap-3 mt-2 border-t pt-4">
+                        <button type="button" onClick={handleClearSearch} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                            <RotateCcw size={16}/> Filtreleri Temizle
+                        </button>
+                        <button type="submit" className="flex items-center gap-2 px-6 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md transition">
+                            <Search size={16}/> Ara
+                        </button>
+                    </div>
+                </form>
+            </div>
+        )}
+      </div>
+
+      {/* --- TABLE --- */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -218,8 +381,6 @@ const AdminDashboard = () => {
               {currentFlights.map((flight) => {
                 const departure = formatDate(flight.departureTime);
                 const arrival = formatDate(flight.arrivalTime);
-                
-                // Doluluk Hesabı (Sıfıra bölünme hatasını önlemek için kontrol)
                 const bookedSeats = flight.totalSeats - flight.remainingSeats;
                 const occupancyRate = flight.totalSeats > 0 ? Math.round((bookedSeats / flight.totalSeats) * 100) : 0;
 
@@ -270,7 +431,7 @@ const AdminDashboard = () => {
                     </div>
                   </td>
 
-                  {/* DOLULUK ORANI */}
+                  {/* Doluluk */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col w-24">
                         <div className="flex justify-between text-xs font-bold mb-1">
@@ -290,8 +451,10 @@ const AdminDashboard = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border 
                         ${flight.status === 'SCHEDULED' ? 'bg-green-50 text-green-700 border-green-200' : 
-                          flight.status === 'CANCELLED' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>
-                      {flight.status === 'SCHEDULED' ? 'Zamanında' : flight.status}
+                          flight.status === 'CANCELLED' ? 'bg-red-50 text-red-700 border-red-200' : 
+                          flight.status === 'DELAYED' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
+                          'bg-gray-50 text-gray-700 border-gray-200'}`}>
+                      {flight.status}
                     </span>
                   </td>
 
@@ -300,15 +463,27 @@ const AdminDashboard = () => {
                     <div className="text-gray-900 font-bold text-lg">${flight.basePrice}</div>
                   </td>
 
-                  {/* İşlem */}
+                  {/* İŞLEM BUTONLARI */}
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <button
-                      onClick={() => handleDelete(flight.id)}
-                      className="text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 p-2 rounded-lg border border-transparent hover:border-red-100 transition shadow-sm"
-                      title="Uçuşu Sil"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <div className="flex justify-end gap-2">
+                        {/* UPDATE BUTTON */}
+                        <button
+                          onClick={() => handleEditClick(flight)}
+                          className="text-gray-400 hover:text-blue-600 bg-white hover:bg-blue-50 p-2 rounded-lg border border-transparent hover:border-blue-100 transition shadow-sm"
+                          title="Düzenle"
+                        >
+                          <Edit size={18} />
+                        </button>
+
+                        {/* DELETE BUTTON */}
+                        <button
+                          onClick={() => handleDelete(flight.id)}
+                          className="text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 p-2 rounded-lg border border-transparent hover:border-red-100 transition shadow-sm"
+                          title="Uçuşu Sil"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                    </div>
                   </td>
                 </tr>
               )})}
@@ -316,7 +491,7 @@ const AdminDashboard = () => {
           </table>
         </div>
 
-        {/* --- PAGINATION FOOTER --- */}
+        {/* Pagination Footer */}
         {flights.length > itemsPerPage && (
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <span className="text-sm text-gray-500">
@@ -356,6 +531,89 @@ const AdminDashboard = () => {
             </div>
         )}
       </div>
+
+      {/* --- UPDATE MODAL (POPUP) --- */}
+      {editingFlight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-gray-100 scale-100 animate-in zoom-in-95 duration-200">
+                {/* Modal Header */}
+                <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Edit size={20}/> Uçuş Düzenle
+                    </h3>
+                    <button 
+                        onClick={() => setEditingFlight(null)} 
+                        className="p-1 hover:bg-blue-700 rounded-full transition"
+                    >
+                        <X size={20}/>
+                    </button>
+                </div>
+
+                {/* Modal Body */}
+                <form onSubmit={handleUpdateSubmit} className="p-6 space-y-4">
+                    
+                    {/* Bilgi Kartı (Sadece Okunur) */}
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+                         <div className="flex justify-between items-center mb-1">
+                             <span className="text-xs font-bold text-blue-600 uppercase">Uçuş No</span>
+                             <span className="font-mono font-bold text-gray-800">{editingFlight.flightNumber}</span>
+                         </div>
+                         <div className="flex justify-between items-center text-sm text-gray-700">
+                             <span>{editingFlight.departureAirport.city} ({editingFlight.departureAirport.iataCode})</span>
+                             <span>➝</span>
+                             <span>{editingFlight.arrivalAirport.city} ({editingFlight.arrivalAirport.iataCode})</span>
+                         </div>
+                    </div>
+
+                    {/* Tarih Değiştirme */}
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Yeni Tarih ve Saat</label>
+                        <input
+                            type="datetime-local"
+                            className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            value={updateForm.newDepartureTime}
+                            onChange={(e) => setUpdateForm({...updateForm, newDepartureTime: e.target.value})}
+                            required
+                        />
+                    </div>
+
+                    {/* Durum Değiştirme */}
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Uçuş Durumu</label>
+                        <select
+                            className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                            value={updateForm.status}
+                            onChange={(e) => setUpdateForm({...updateForm, status: e.target.value})}
+                        >
+                            <option value="SCHEDULED">SCHEDULED (Zamanında)</option>
+                            <option value="DELAYED">DELAYED (Rötarlı)</option>
+                            <option value="CANCELLED">CANCELLED (İptal)</option>
+                            <option value="COMPLETED">COMPLETED (Tamamlandı)</option>
+                        </select>
+                    </div>
+
+                    {/* Butonlar */}
+                    <div className="flex gap-3 mt-6 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setEditingFlight(null)}
+                            className="flex-1 py-2 rounded-lg border border-gray-300 text-gray-700 font-bold hover:bg-gray-50 transition"
+                        >
+                            İptal
+                        </button>
+                        <button
+                            type="submit"
+                            className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-md transition flex justify-center items-center gap-2"
+                        >
+                            <Save size={18}/> Kaydet
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };
