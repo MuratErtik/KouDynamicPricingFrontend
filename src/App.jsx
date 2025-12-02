@@ -10,6 +10,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import SearchResultsPage from './pages/booking/SearchResultsPage';
 import SeatSelectionPage from './pages/booking/SeatSelectionPage';
 import SearchForm from './components/booking/SearchForm';
+import { AuthProvider } from './context/AuthContext'; // <--- Import
 
 // Anasayfa Bileşeni (Basit)
 const HomePage = () => (
@@ -21,7 +22,7 @@ const HomePage = () => (
     </div>
     {/* Arama Formu */}
     <SearchForm />
-    
+
     <div className="container mx-auto mt-20 p-4 text-center text-gray-500">
       <p>Popüler Destinasyonlar: İstanbul, İzmir, Antalya...</p>
     </div>
@@ -31,20 +32,26 @@ const HomePage = () => (
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<HomePage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="signup" element={<SignupPage />} />
-          
-          {/* Public Booking Routes */}
-          <Route path="flights" element={<SearchResultsPage />} />
-          <Route path="book/:flightId" element={<SeatSelectionPage />} />
+      <AuthProvider>
+        <div className="flex flex-col min-h-screen">
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<HomePage />} />
+              <Route path="login" element={<LoginPage />} />
+              <Route path="signup" element={<SignupPage />} />
 
-          {/* Admin Routes (Normalde PrivateRoute ile korunmalı) */}
-          <Route path="admin/dashboard" element={<AdminDashboard />} />
-        </Route>
-      </Routes>
+              {/* Public Booking Routes */}
+              <Route path="flights" element={<SearchResultsPage />} />
+              <Route path="book/:flightId" element={<SeatSelectionPage />} />
+
+              {/* Admin Routes (Normalde PrivateRoute ile korunmalı) */}
+              <Route path="admin/dashboard" element={<AdminDashboard />} />
+            </Route>
+          </Routes>
+        </div>
+
+      </AuthProvider>
+
       <ToastContainer position="top-right" autoClose={3000} />
     </BrowserRouter>
   );
