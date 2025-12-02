@@ -12,7 +12,7 @@ import {
   PlaneLanding,
   Calendar,
   Clock,
-  Users // Koltuk ikonu için
+  Users 
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -67,6 +67,7 @@ const AdminDashboard = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    // Ekstra güvenlik kontrolü (UI engellese bile)
     if (newFlight.departureAirportId === newFlight.arrivalAirportId) {
       toast.warning("Kalkış ve Varış noktası aynı olamaz!");
       return;
@@ -125,7 +126,6 @@ const AdminDashboard = () => {
           <div className="md:col-span-2">
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nereden</label>
             <div className="relative">
-                {/* İkonu dikeyde tam ortalamak için top-1/2 ve -translate-y-1/2 kullanıyoruz */}
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
                     <PlaneTakeoff size={20}/>
                 </div>
@@ -136,7 +136,10 @@ const AdminDashboard = () => {
                     required
                 >
                     <option value="">Havalimanı Seçiniz</option>
-                    {airports.map((a) => (
+                    {/* FİLTRELEME: Nereye kısmında seçili olan ID burada gözükmesin */}
+                    {airports
+                        .filter(a => a.id.toString() !== newFlight.arrivalAirportId)
+                        .map((a) => (
                         <option key={a.id} value={a.id}>{a.city} ({a.iataCode})</option>
                     ))}
                 </select>
@@ -157,7 +160,10 @@ const AdminDashboard = () => {
                     required
                 >
                     <option value="">Havalimanı Seçiniz</option>
-                    {airports.map((a) => (
+                    {/* FİLTRELEME: Nereden kısmında seçili olan ID burada gözükmesin */}
+                    {airports
+                        .filter(a => a.id.toString() !== newFlight.departureAirportId)
+                        .map((a) => (
                         <option key={a.id} value={a.id}>{a.city} ({a.iataCode})</option>
                     ))}
                 </select>
@@ -200,7 +206,6 @@ const AdminDashboard = () => {
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center gap-1"><PlaneLanding size={14}/> Varış</div>
                 </th>
-                {/* YENİ EKLENEN SÜTUN: KOLTUK */}
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center gap-1"><Users size={14}/> Doluluk</div>
                 </th>
@@ -214,9 +219,9 @@ const AdminDashboard = () => {
                 const departure = formatDate(flight.departureTime);
                 const arrival = formatDate(flight.arrivalTime);
                 
-                // Doluluk Hesabı
+                // Doluluk Hesabı (Sıfıra bölünme hatasını önlemek için kontrol)
                 const bookedSeats = flight.totalSeats - flight.remainingSeats;
-                const occupancyRate = Math.round((bookedSeats / flight.totalSeats) * 100);
+                const occupancyRate = flight.totalSeats > 0 ? Math.round((bookedSeats / flight.totalSeats) * 100) : 0;
 
                 return (
                 <tr key={flight.id} className="hover:bg-blue-50/50 transition duration-150 group">
@@ -265,7 +270,7 @@ const AdminDashboard = () => {
                     </div>
                   </td>
 
-                  {/* DOLULUK ORANI (Koltuk) */}
+                  {/* DOLULUK ORANI */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col w-24">
                         <div className="flex justify-between text-xs font-bold mb-1">
