@@ -1,18 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import adminService from '../../services/adminService';
-import publicService from '../../services/publicService';
-import { toast } from 'react-toastify';
-import { Trash2, Plus, Plane } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import adminService from "../../services/adminService";
+import publicService from "../../services/publicService";
+import { toast } from "react-toastify";
+import { Trash2, Plus, Plane } from "lucide-react";
 
 const AdminDashboard = () => {
   const [flights, setFlights] = useState([]);
   const [airports, setAirports] = useState([]);
-  
+
   // Yeni uçuş formu state'i
   const [newFlight, setNewFlight] = useState({
-    departureAirportId: '',
-    arrivalAirportId: '',
-    departureTime: ''
+    departureAirportId: "",
+    arrivalAirportId: "",
+    departureTime: "",
   });
 
   useEffect(() => {
@@ -21,13 +21,17 @@ const AdminDashboard = () => {
 
   const loadData = async () => {
     try {
+      // Promise.all ile iki isteği paralel atıyoruz
       const [flightsData, airportsData] = await Promise.all([
         adminService.getAllFlights(),
-        publicService.getAirports()
+
+        publicService.getAirports(), // <--- EKSİK OLAN KISIM BURASIYDI
       ]);
+
       setFlights(flightsData);
-      setAirports(airportsData);
+      setAirports(airportsData); // <--- State'i güncellemeyi unutma
     } catch (error) {
+      console.error(error);
       toast.error("Veriler yüklenirken hata oluştu.");
     }
   };
@@ -37,7 +41,7 @@ const AdminDashboard = () => {
       try {
         await adminService.deleteFlight(id);
         toast.success("Uçuş başarıyla silindi.");
-        setFlights(flights.filter(f => f.id !== id));
+        setFlights(flights.filter((f) => f.id !== id));
       } catch (error) {
         toast.error("Silme işlemi başarısız.");
       }
@@ -54,7 +58,11 @@ const AdminDashboard = () => {
     try {
       await adminService.createFlight(newFlight);
       toast.success("Uçuş planlandı!");
-      setNewFlight({ departureAirportId: '', arrivalAirportId: '', departureTime: '' });
+      setNewFlight({
+        departureAirportId: "",
+        arrivalAirportId: "",
+        departureTime: "",
+      });
       loadData(); // Listeyi yenile
     } catch (error) {
       toast.error("Uçuş oluşturulamadı.");
@@ -69,43 +77,74 @@ const AdminDashboard = () => {
 
       {/* Yeni Uçuş Ekleme Formu (Basit Kart Görünümü) */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-10 border-l-4 border-blue-500">
-        <h2 className="text-xl font-semibold mb-4 text-gray-700">Yeni Uçuş Planla</h2>
-        <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <h2 className="text-xl font-semibold mb-4 text-gray-700">
+          Yeni Uçuş Planla
+        </h2>
+        <form
+          onSubmit={handleCreate}
+          className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+        >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nereden</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nereden
+            </label>
             <select
               className="w-full border p-2 rounded"
               value={newFlight.departureAirportId}
-              onChange={(e) => setNewFlight({...newFlight, departureAirportId: e.target.value})}
+              onChange={(e) =>
+                setNewFlight({
+                  ...newFlight,
+                  departureAirportId: e.target.value,
+                })
+              }
               required
             >
               <option value="">Seçiniz</option>
-              {airports.map(a => <option key={a.id} value={a.id}>{a.city} ({a.iataCode})</option>)}
+              {airports.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.city} ({a.iataCode})
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nereye</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nereye
+            </label>
             <select
               className="w-full border p-2 rounded"
               value={newFlight.arrivalAirportId}
-              onChange={(e) => setNewFlight({...newFlight, arrivalAirportId: e.target.value})}
+              onChange={(e) =>
+                setNewFlight({ ...newFlight, arrivalAirportId: e.target.value })
+              }
               required
             >
               <option value="">Seçiniz</option>
-              {airports.map(a => <option key={a.id} value={a.id}>{a.city} ({a.iataCode})</option>)}
+              {airports.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.city} ({a.iataCode})
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tarih ve Saat</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tarih ve Saat
+            </label>
             <input
               type="datetime-local"
               className="w-full border p-2 rounded"
               value={newFlight.departureTime}
-              onChange={(e) => setNewFlight({...newFlight, departureTime: e.target.value})}
+              onChange={(e) =>
+                setNewFlight({ ...newFlight, departureTime: e.target.value })
+              }
               required
             />
           </div>
-          <button type="submit" className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-bold flex justify-center items-center gap-2">
+          <button
+            type="submit"
+            className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 font-bold flex justify-center items-center gap-2"
+          >
             <Plus size={18} /> Planla
           </button>
         </form>
@@ -116,28 +155,52 @@ const AdminDashboard = () => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uçuş No</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rota</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fiyat</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Uçuş No
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rota
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Tarih
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Durum
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Fiyat
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                İşlem
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {flights.map((flight) => (
               <tr key={flight.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-blue-900">{flight.flightNumber}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{flight.departureCity} ➝ {flight.arrivalCity}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{new Date(flight.departureTime).toLocaleString('tr-TR')}</td>
+                <td className="px-6 py-4 whitespace-nowrap font-medium text-blue-900">
+                  {flight.flightNumber}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {flight.departureAirport?.city} ➝{" "}
+                  {flight.arrivalAirport?.city}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {new Date(flight.departureTime).toLocaleString("tr-TR")}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                    {flight.status || 'Aktif'}
+                    {flight.status || "Aktif"}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-700">{flight.price} ₺</td>
+                <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-700">
+                  {flight.basePrice} ₺
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <button onClick={() => handleDelete(flight.id)} className="text-red-600 hover:text-red-900">
+                  <button
+                    onClick={() => handleDelete(flight.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
                     <Trash2 size={20} />
                   </button>
                 </td>
