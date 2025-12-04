@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Plane, User, LogOut } from 'lucide-react';
+import { Plane, User, LogOut, Calendar } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext'; // Hook'u import ettik
 
 const Header = () => {
@@ -21,8 +21,8 @@ const Header = () => {
             // Giriş Yapmamış Kullanıcı
             <>
               <Link to="/login" className="hover:text-blue-200 font-medium">Giriş Yap</Link>
-              <Link 
-                to="/signup" 
+              <Link
+                to="/signup"
                 className="bg-white text-blue-600 px-4 py-2 rounded-full font-bold hover:bg-blue-50 transition shadow-sm"
               >
                 Kayıt Ol
@@ -34,18 +34,23 @@ const Header = () => {
               <span className="flex items-center gap-1 font-medium">
                 <User size={18} />
                 {/* İsim Context'ten geliyor */}
-                Merhaba, {user.name} 
+                Merhaba, {user.name}
               </span>
-              
-              {/* Admin Linki (Sadece Adminlere) */}
+
               {user.role === 'ROLE_ADMIN' && (
-                <Link to="/admin/dashboard" className="text-sm bg-blue-700 px-3 py-1 rounded hover:bg-blue-800">
-                  Yönetim Paneli
-                </Link>
+                <div className="flex gap-2">
+                  <Link to="/admin/dashboard" className="text-sm bg-blue-700 px-3 py-1 rounded hover:bg-blue-800">
+                    Uçuşlar
+                  </Link>
+                  {/* NEW LINK */}
+                  <Link to="/admin/special-days" className="text-sm bg-purple-600 px-3 py-1 rounded hover:bg-purple-700 flex items-center gap-1">
+                    <Calendar size={14} /> Özel Günler
+                  </Link>
+                </div>
               )}
 
-              <button 
-                onClick={logout} 
+              <button
+                onClick={logout}
                 className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1 transition"
               >
                 <LogOut size={16} /> Çıkış
