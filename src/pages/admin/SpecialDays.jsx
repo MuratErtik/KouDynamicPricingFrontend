@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import specialDayService from "../../services/specialDayService";
+import SpecialDaysFilter from "../../components/admin/SpecialDaysFilter"; // Filtre bileşeni import edildi
 import { toast } from "react-toastify";
 import { 
   Calendar, 
@@ -8,12 +9,13 @@ import {
   Edit, 
   Save, 
   X, 
-  RefreshCw, // Tekrar eden kural ikonu
+  RefreshCw, 
   MapPin, 
   Globe,
   AlertCircle,
   CheckCircle,
-  Search
+  ChevronLeft,   // Sayfalama ikonu
+  ChevronRight   // Sayfalama ikonu
 } from "lucide-react";
 
 const SpecialDays = () => {
@@ -21,8 +23,15 @@ const SpecialDays = () => {
   const [specialDays, setSpecialDays] = useState([]);
   const [countries, setCountries] = useState([]); // Backend'den gelen ülke listesi
   const [cities, setCities] = useState([]);       // Seçilen ülkeye göre değişen şehir listesi
-  const [loading, setLoading] = useState(true);   // Yükleniyor durumu
+  const [loading, setLoading] = useState(true);   // Yükleniyor animasyonu için
   
+  // --- SAYFALAMA (PAGINATION) STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Her sayfada 10 kayıt gösterilecek
+
+  // Arama Filtresi State'i
+  const [activeFilters, setActiveFilters] = useState(null);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // Null = Yeni Ekle, ID = Düzenle
@@ -40,39 +49,62 @@ const SpecialDays = () => {
 
   // --- BAŞLANGIÇ YÜKLEMELERİ ---
   useEffect(() => {
-    fetchInitialData();
+    fetchData();      // İlk açılışta verileri çek
+    loadCountries(); // Ülke listesini çek
   }, []);
 
-  const fetchInitialData = async () => {
+  // --- VERİ ÇEKME FONKSİYONU (Hem Arama Hem Listeleme) ---
+  const fetchData = async (filters = null) => {
     setLoading(true);
     try {
-      // Paralel istek atarak performansı artırıyoruz
-      const [rulesData, countriesData] = await Promise.all([
-        specialDayService.getAllSpecialDays(),
-        specialDayService.getCountries()
-      ]);
-      
-      setSpecialDays(rulesData);
-      setCountries(countriesData);
+      let data;
+      if (filters) {
+        // Filtre varsa Arama Endpoint'ini kullan
+        data = await specialDayService.searchSpecialDays(filters);
+        setActiveFilters(filters);
+        toast.info(`${data.length} kural bulundu.`, { autoClose: 2000 });
+      } else {
+        // Filtre yoksa Tümünü Getir
+        data = await specialDayService.getAllSpecialDays();
+        setActiveFilters(null);
+      }
+      setSpecialDays(data);
+      setCurrentPage(1); // Veri değişince her zaman 1. sayfaya dön
     } catch (error) {
       console.error("Veri yükleme hatası:", error);
-      toast.error("Veriler yüklenirken bir hata oluştu.");
+      toast.error("Veriler yüklenirken hata oluştu.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Sadece Tabloyu Yenilemek İçin
-  const reloadTable = async () => {
+  const loadCountries = async () => {
     try {
-      const data = await specialDayService.getAllSpecialDays();
-      setSpecialDays(data);
+      const data = await specialDayService.getCountries();
+      setCountries(data);
     } catch (error) {
-      console.error(error);
+      console.error("Ülkeler yüklenemedi", error);
     }
   };
 
-  // --- HANDLERS (Olay Yönetimi) ---
+  // --- SAYFALAMA MANTIĞI ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = specialDays.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(specialDays.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  // --- FİLTRE HANDLERLARI ---
+  const handleFilterSearch = (filters) => {
+    fetchData(filters);
+  };
+
+  const handleFilterClear = () => {
+    fetchData(null); // Filtreyi temizle ve hepsini getir
+  };
+
+  // --- FORM HANDLERS (Olay Yönetimi) ---
 
   // Ülke değişince Şehirleri getiren fonksiyon (Cascading Dropdown)
   const handleCountryChange = async (e) => {
@@ -88,7 +120,6 @@ const SpecialDays = () => {
     // 2. Eğer geçerli bir ülke seçildiyse şehirleri çek
     if (selectedCountry && selectedCountry !== "Global") {
       try {
-        // Backend: /api/public/airport/cities?country=Turkey
         const cityList = await specialDayService.getCitiesByCountry(selectedCountry);
         setCities(cityList);
       } catch (error) {
@@ -101,15 +132,13 @@ const SpecialDays = () => {
     }
   };
 
-  // Modal Açma Mantığı (Edit / Create Ayrımı)
   const handleOpenModal = (rule = null) => {
     if (rule) {
-      // --- DÜZENLEME MODU (EDIT) ---
+      // Edit Mode
       setEditingId(rule.id);
       
       // Backend 'recurring' veya 'isRecurring' gönderebilir.
-      // Hangisi tanımlıysa onu al, ikisi de yoksa false kabul et.
-      const recurringValue = rule.recurring !== undefined ? rule.recurring : (rule.isRecurring || false);
+      const recurringValue = rule.recurring !== undefined ? rule.recurring : rule.isRecurring;
 
       setFormData({
         name: rule.name,
@@ -118,28 +147,22 @@ const SpecialDays = () => {
         priceMultiplier: rule.priceMultiplier,
         targetCountry: rule.targetCountry || "",
         targetCity: rule.targetCity || "",
-        // Değeri boolean olduğundan emin ol (!! kullan)
+        // Değeri boolean olduğundan emin ol
         isRecurring: !!recurringValue 
       });
       
-      // Eğer düzenlediğimiz kuralda ülke varsa, şehirlerini de hemen çekelim ki dropdown dolsun
+      // Şehirleri getir
       if (rule.targetCountry) {
-        specialDayService.getCitiesByCountry(rule.targetCountry)
-          .then(data => setCities(data))
-          .catch(() => setCities([]));
+        specialDayService.getCitiesByCountry(rule.targetCountry).then(setCities);
       } else {
         setCities([]);
       }
     } else {
-      // --- YENİ EKLEME MODU (CREATE) ---
+      // Create Mode
       setEditingId(null);
       setFormData({
-        name: "", 
-        startDate: "", 
-        endDate: "", 
-        priceMultiplier: 1.1,
-        targetCountry: "", 
-        targetCity: "", 
+        name: "", startDate: "", endDate: "", priceMultiplier: 1.1,
+        targetCountry: "", targetCity: "", 
         isRecurring: false 
       });
       setCities([]);
@@ -148,20 +171,27 @@ const SpecialDays = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Bu fiyat kuralını silmek istediğinize emin misiniz?")) {
+    if (window.confirm("Bu kuralı silmek istediğinize emin misiniz?")) {
       try {
         await specialDayService.deleteSpecialDay(id);
-        toast.success("Kural başarıyla silindi.");
-        // State'den çıkararak sayfayı yenilemeden güncelleyelim
-        setSpecialDays(prev => prev.filter(d => d.id !== id));
+        toast.success("Kural silindi.");
+        
+        // Listeden sil (State güncelleme)
+        const updatedList = specialDays.filter(d => d.id !== id);
+        setSpecialDays(updatedList);
+
+        // Eğer sildiğimiz kayıt sayfadaki son kayıt ise bir önceki sayfaya git
+        // (currentItems o anki sayfadaki verilerdir)
+        if (currentItems.length === 1 && currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+
       } catch (error) {
-        console.error(error);
         toast.error("Silme işlemi başarısız.");
       }
     }
   };
 
-  // Form Gönderme İşlemi
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -174,18 +204,12 @@ const SpecialDays = () => {
       toast.warning("Çarpan pozitif olmalıdır!");
       return;
     }
-    if (!formData.name.trim()) {
-      toast.warning("Lütfen bir kural adı giriniz.");
-      return;
-    }
 
-    // Backend'e gidecek veriyi hazırla
     const payload = {
       name: formData.name,
       startDate: formData.startDate,
       endDate: formData.endDate,
       priceMultiplier: parseFloat(formData.priceMultiplier),
-      // Backend null bekliyorsa boş string gönderme
       targetCountry: formData.targetCountry === "" || formData.targetCountry === "Global" ? null : formData.targetCountry,
       targetCity: formData.targetCity === "" ? null : formData.targetCity,
       
@@ -193,8 +217,6 @@ const SpecialDays = () => {
       recurring: formData.isRecurring,
       isRecurring: formData.isRecurring
     };
-
-    console.log("Backend'e giden payload:", payload);
 
     try {
       if (editingId) {
@@ -205,27 +227,26 @@ const SpecialDays = () => {
         toast.success("Yeni kural oluşturuldu!");
       }
       setIsModalOpen(false);
-      reloadTable(); // Verileri tazelee
+      
+      // İşlem bitince listeyi yenile (aktif filtre varsa onu koruyarak)
+      fetchData(activeFilters);
     } catch (error) {
-      console.error(error);
-      toast.error("İşlem başarısız. Lütfen verileri kontrol edin.");
+      toast.error("İşlem başarısız.");
     }
   };
-
-  // --- RENDER ---
 
   return (
     <div className="container mx-auto p-6 min-h-screen bg-gray-50/50">
       
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-blue-900 flex items-center gap-3">
             <Calendar className="text-blue-600" size={32} /> 
             Özel Günler & Fiyatlandırma
           </h1>
           <p className="text-gray-500 mt-1 text-sm ml-11">
-            Bayramlar, tatiller ve özel sezonlar için fiyat çarpanlarını yönetin.
+            Toplam <strong>{specialDays.length}</strong> kural listeleniyor.
           </p>
         </div>
         
@@ -237,8 +258,15 @@ const SpecialDays = () => {
         </button>
       </div>
 
-      {/* DATA TABLE SECTION */}
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+      {/* --- FİLTRELEME BİLEŞENİ --- */}
+      <SpecialDaysFilter 
+        onSearch={handleFilterSearch} 
+        onClear={handleFilterClear} 
+        countries={countries}
+      />
+
+      {/* TABLE */}
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
         
         {loading ? (
           <div className="p-12 text-center text-gray-500 flex flex-col items-center">
@@ -258,8 +286,8 @@ const SpecialDays = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {specialDays.length > 0 ? (
-                  specialDays.map((day) => {
+                {currentItems.length > 0 ? (
+                  currentItems.map((day) => {
                     // Badge gösterimi için recurring kontrolü
                     const isRec = day.recurring !== undefined ? day.recurring : day.isRecurring;
                     
@@ -284,7 +312,6 @@ const SpecialDays = () => {
                               <span className="text-gray-400">➝</span>
                               {new Date(day.endDate).toLocaleDateString("tr-TR")}
                             </span>
-                            {/* Gün sayısını hesaplayıp gösterebiliriz opsiyonel olarak */}
                             <span className="text-xs text-gray-400 mt-0.5">
                               {Math.ceil((new Date(day.endDate) - new Date(day.startDate)) / (1000 * 60 * 60 * 24))} Gün
                             </span>
@@ -357,11 +384,12 @@ const SpecialDays = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center justify-center text-gray-400">
+                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                      <div className="flex flex-col items-center justify-center">
                         <AlertCircle size={48} className="mb-4 text-gray-300" />
-                        <p className="text-lg font-medium text-gray-600">Henüz tanımlanmış bir kural yok.</p>
-                        <p className="text-sm">"Yeni Kural Ekle" butonunu kullanarak başlayabilirsiniz.</p>
+                        <p className="text-lg font-medium text-gray-600">
+                          {activeFilters ? "Filtre kriterlerine uygun kayıt bulunamadı." : "Henüz tanımlanmış bir kural yok."}
+                        </p>
                       </div>
                     </td>
                   </tr>
@@ -369,6 +397,47 @@ const SpecialDays = () => {
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* --- PAGINATION FOOTER (EKLENDİ) --- */}
+        {specialDays.length > itemsPerPage && (
+            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <span className="text-sm text-gray-500">
+                    Sayfa <span className="font-medium text-gray-900">{currentPage}</span> / {totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => paginate(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className={`p-2 rounded-lg border transition ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-transparent' : 'bg-white text-gray-600 hover:bg-white hover:border-blue-500 hover:text-blue-600 border-gray-300 shadow-sm'}`}
+                    >
+                        <ChevronLeft size={18} />
+                    </button>
+
+                    {/* Basit Sayfalama Numaraları */}
+                    {Array.from({ length: totalPages }, (_, i) => (
+                        <button
+                            key={i + 1}
+                            onClick={() => paginate(i + 1)}
+                            className={`w-8 h-8 rounded-lg text-sm font-bold border transition shadow-sm ${
+                                currentPage === i + 1
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "bg-white text-gray-600 border-gray-300 hover:border-blue-500 hover:text-blue-600"
+                            }`}
+                        >
+                            {i + 1}
+                        </button>
+                    ))}
+
+                    <button 
+                        onClick={() => paginate(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className={`p-2 rounded-lg border transition ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-transparent' : 'bg-white text-gray-600 hover:bg-white hover:border-blue-500 hover:text-blue-600 border-gray-300 shadow-sm'}`}
+                    >
+                        <ChevronRight size={18} />
+                    </button>
+                </div>
+            </div>
         )}
       </div>
 
@@ -451,7 +520,7 @@ const SpecialDays = () => {
                 </div>
               </div>
 
-              {/* Row 3: Recurring Checkbox (Custom Style) */}
+              {/* Row 3: Recurring Checkbox (DÜZELTİLMİŞ) */}
               <div 
                 className={`flex items-center gap-3 p-4 rounded-xl border transition cursor-pointer ${
                   formData.isRecurring 
