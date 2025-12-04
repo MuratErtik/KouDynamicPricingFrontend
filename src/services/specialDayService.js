@@ -1,10 +1,9 @@
 import api from './api';
 
 const BASE_URL = '/admin/special-days';
-// DİKKAT: Java kodunda @RequestMapping("/api/public/airport") olduğu için 's' takısını kaldırdık.
 const PUBLIC_URL = '/public/airport'; 
 
-// --- CRUD İşlemleri (Değişmedi) ---
+// --- CRUD İşlemleri ---
 const getAllSpecialDays = async () => {
   const response = await api.get(BASE_URL);
   return response.data;
@@ -24,7 +23,18 @@ const deleteSpecialDay = async (id) => {
   await api.delete(`${BASE_URL}/${id}`);
 };
 
-// --- DROPDOWN HELPERLARI (Backend ile Eşleşti) ---
+const searchSpecialDays = async (filters) => {
+  const cleanFilters = Object.fromEntries(
+    Object.entries(filters).filter(([_, v]) => v != null && v !== "")
+  );
+
+  const response = await api.get(`${BASE_URL}/search`, {
+    params: cleanFilters 
+  });
+  return response.data;
+};
+
+// --- DROPDOWN HELPERLARI  ---
 
 // Backend: @GetMapping("/countries") -> List<String>
 const getCountries = async () => {
@@ -44,6 +54,7 @@ export default {
   getAllSpecialDays,
   createSpecialDay,
   updateSpecialDay,
+  searchSpecialDays,
   deleteSpecialDay,
   getCountries,
   getCitiesByCountry
