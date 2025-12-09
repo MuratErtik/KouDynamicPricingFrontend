@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar, PlaneTakeoff, PlaneLanding, ArrowRightLeft, ArrowRight } from 'lucide-react';
+import { Search, Calendar, PlaneTakeoff, PlaneLanding, ArrowRight } from 'lucide-react';
 import { toast } from 'react-toastify';
 import AsyncAirportSelect from '../common/AsyncAirportSelect';
 import PassengerCounter from '../common/PassengerCounter';
@@ -9,12 +9,11 @@ const HomeSearchSection = () => {
   const navigate = useNavigate();
   
   // --- STATE ---
-  const [tripType, setTripType] = useState('one-way'); // 'one-way' | 'round-trip'
+  const [tripType, setTripType] = useState('one-way');
   const [fromAirport, setFromAirport] = useState(null);
   const [toAirport, setToAirport] = useState(null);
   const [passengers, setPassengers] = useState(1);
   
-  // Date States (Using ISO String YYYY-MM-DD for input compatibility)
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
 
@@ -25,7 +24,7 @@ const HomeSearchSection = () => {
   const handleSearch = (e) => {
     e.preventDefault();
 
-    // Validation
+    // Validasyonlar
     if (!fromAirport || !toAirport) {
       toast.warning("Lütfen kalkış ve varış noktalarını seçiniz.");
       return;
@@ -43,23 +42,24 @@ const HomeSearchSection = () => {
       return;
     }
 
-    // Navigate to results
+    // --- DÜZELTME BURADA ---
     const queryParams = new URLSearchParams({
-      fromId: fromAirport.id,
-      toId: toAirport.id,
-      departureDate,
-      ...(tripType === 'round-trip' && { returnDate }),
-      passengers
-    }).toString();
-
-    navigate(`/flights?${queryParams}`);
+        departureDate,
+        departureAirportIataCode: fromAirport.iataCode,
+        arrivalAirportIataCode: toAirport.iataCode,
+        ...(tripType === 'round-trip' && { returnDate }),
+      }).toString();
+      
+  
+      // App.jsx'teki route tanımı '/flights' olduğu için '/flights/search' YAZMAMALISIN.
+      // Doğrusu budur:
+      navigate(`/flights/search?${queryParams}`);
   };
 
-  // Date Logic: Ensure Return Date >= Departure Date
+  // Tarih Mantığı: Dönüş tarihi, gidiş tarihinden önce olamaz
   const handleDepartureChange = (e) => {
     const newDate = e.target.value;
     setDepartureDate(newDate);
-    // If return date exists and is before new departure, reset it
     if (returnDate && newDate > returnDate) {
       setReturnDate('');
     }
@@ -114,7 +114,7 @@ const HomeSearchSection = () => {
             />
           </div>
 
-          {/* SWAP ICON (Optional Visual) */}
+          {/* SWAP ICON */}
           <div className="hidden md:flex md:col-span-1 justify-center pb-4">
             <div className="bg-gray-100 p-2 rounded-full text-gray-400">
               <ArrowRight className="text-gray-400" />
@@ -133,9 +133,8 @@ const HomeSearchSection = () => {
             />
           </div>
 
-          {/* 3. DATES (3 Cols - Dynamic) */}
+          {/* 3. DATES (3 Cols) */}
           <div className="md:col-span-3 flex gap-2">
-            {/* Departure Date */}
             <div className={`relative w-full ${tripType === 'round-trip' ? 'md:w-1/2' : 'w-full'}`}>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Gidiş</label>
               <div className="relative">
@@ -151,7 +150,6 @@ const HomeSearchSection = () => {
               </div>
             </div>
 
-            {/* Return Date (Conditional) */}
             {tripType === 'round-trip' && (
               <div className="relative w-full md:w-1/2 animate-in fade-in slide-in-from-left-4">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Dönüş</label>

@@ -40,38 +40,36 @@ function App() {
         <div className="flex flex-col min-h-screen">
           <Routes>
             <Route path="/" element={<Layout />}>
-              
-              {/* Ana Sayfa (Artık yeni HomePage.jsx dosyası render edilecek) */}
               <Route index element={<HomePage />} />
-              
-              {/* Auth Routes */}
+
+              {/* Auth */}
               <Route path="login" element={<LoginPage />} />
               <Route path="signup" element={<SignupPage />} />
 
-              {/* Public Booking Routes */}
+              {/* Booking */}
               <Route path="flights" element={<SearchResultsPage />} />
+              <Route path="flights/search" element={<SearchResultsPage />} /> {/* 🔧 EKLENDİ */}
               <Route path="book/:flightId" element={<SeatSelectionPage />} />
 
-              {/* --- ADMIN ROUTES (KORUMALI) --- */}
-              <Route 
-                path="admin/dashboard" 
+              {/* Admin */}
+              <Route
+                path="admin/dashboard"
                 element={
                   <AdminRoute>
                     <AdminDashboard />
                   </AdminRoute>
-                } 
+                }
               />
-              
-              <Route 
-                path="admin/special-days" 
+              <Route
+                path="admin/special-days"
                 element={
                   <AdminRoute>
                     <SpecialDays />
                   </AdminRoute>
-                } 
+                }
               />
-
             </Route>
+
           </Routes>
         </div>
       </AuthProvider>
