@@ -42,18 +42,16 @@ const HomeSearchSection = () => {
       return;
     }
 
-    // --- DÜZELTME BURADA ---
+    // URL parametrelerini oluştur
     const queryParams = new URLSearchParams({
-        departureDate,
-        departureAirportIataCode: fromAirport.iataCode,
-        arrivalAirportIataCode: toAirport.iataCode,
-        ...(tripType === 'round-trip' && { returnDate }),
-      }).toString();
-      
-  
-      // App.jsx'teki route tanımı '/flights' olduğu için '/flights/search' YAZMAMALISIN.
-      // Doğrusu budur:
-      navigate(`/flights/search?${queryParams}`);
+      departureDate,
+      departureAirportIataCode: fromAirport.iataCode,
+      arrivalAirportIataCode: toAirport.iataCode,
+      passengers: passengers.toString(),
+      ...(tripType === 'round-trip' && returnDate && { returnDate }),
+    }).toString();
+
+    navigate(`/flights/search?${queryParams}`);
   };
 
   // Tarih Mantığı: Dönüş tarihi, gidiş tarihinden önce olamaz
@@ -173,18 +171,18 @@ const HomeSearchSection = () => {
             <PassengerCounter count={passengers} onChange={setPassengers} />
           </div>
 
-        </form>
+          {/* --- SEARCH BUTTON --- */}
+          <div className="md:col-span-12 mt-2 flex justify-end">
+            <button
+              type="submit"
+              className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg py-4 px-12 rounded-xl shadow-lg hover:shadow-blue-200 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3"
+            >
+              <Search size={24} />
+              Uçuş Ara
+            </button>
+          </div>
 
-        {/* --- SEARCH BUTTON --- */}
-        <div className="mt-6 flex justify-end">
-          <button 
-            onClick={handleSearch}
-            className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg py-4 px-12 rounded-xl shadow-lg hover:shadow-blue-200 transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3"
-          >
-            <Search size={24} />
-            Uçuş Ara
-          </button>
-        </div>
+        </form>
 
       </div>
     </div>
