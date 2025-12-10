@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import publicService from '../../services/publicService';
-import { Clock, ArrowRight } from 'lucide-react';
+import flightSearchService from '../../services/flightSearchService';
+import { ArrowRight, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
 
 const SearchResultsPage = () => {
   const [searchParams] = useSearchParams();
+  const [allFlightData, setAllFlightData] = useState(null);
+  const [selectedDateTab, setSelectedDateTab] = useState('selected');
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -12,12 +16,26 @@ const SearchResultsPage = () => {
   useEffect(() => {
     const fetchFlights = async () => {
       try {
-        const data = await publicService.searchFlights(
-          searchParams.get('from'),
-          searchParams.get('to'),
-          searchParams.get('date')
+        const fromCode = searchParams.get('departureAirportIataCode');
+        const toCode = searchParams.get('arrivalAirportIataCode');
+        const departureDate = searchParams.get('departureDate');
+
+        if (!fromCode || !toCode || !departureDate) {
+          console.error('Eksik parametreler:', { fromCode, toCode, departureDate });
+          setLoading(false);
+          return;
+        }
+
+        const result = await flightSearchService.searchFlightsWithNeighbors(
+          fromCode,
+          toCode,
+          departureDate
         );
-        setFlights(data);
+
+        setAllFlightData(result);
+        // Varsayılan olarak seçilen tarihi göster
+        setFlights(result.selectedDate.data);
+        setSelectedDateTab('selected');
       } catch (error) {
         console.error(error);
       } finally {
@@ -27,11 +45,83 @@ const SearchResultsPage = () => {
     fetchFlights();
   }, [searchParams]);
 
+  const handleDateTabClick = (tabKey) => {
+    setSelectedDateTab(tabKey);
+    if (tabKey === 'prev' && allFlightData?.prevDay) {
+      setFlights(allFlightData.prevDay.data);
+    } else if (tabKey === 'selected') {
+      setFlights(allFlightData.selectedDate.data);
+    } else if (tabKey === 'next') {
+      setFlights(allFlightData.nextDay.data);
+    }
+  };
+
+  const formatDateTab = (dateObj) => {
+    return format(dateObj, 'd MMM EEEE', { locale: tr });
+  };
+
   if (loading) return <div className="text-center mt-20">Uçuşlar aranıyor...</div>;
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Uçuş Sonuçları</h2>
+      <h2 className="text-2xl font-bold mb-4 text-gray-800">Uçuş Sonuçları</h2>
+
+      {/* Tarih Navigation */}
+      {allFlightData && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2 mb-6 flex gap-2">
+          {/* Önceki Gün */}
+          {allFlightData.prevDay && (
+            <button
+              onClick={() => handleDateTabClick('prev')}
+              className={`flex-1 py-3 px-4 rounded-lg transition-all ${
+                selectedDateTab === 'prev'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Calendar size={18} />
+                <span className="text-sm font-semibold">{formatDateTab(allFlightData.prevDay.date)}</span>
+                <span className="text-xs opacity-80">{allFlightData.prevDay.data.length} uçuş</span>
+              </div>
+            </button>
+          )}
+
+          {/* Seçilen Gün */}
+          <button
+            onClick={() => handleDateTabClick('selected')}
+            className={`flex-1 py-3 px-4 rounded-lg transition-all ${
+              selectedDateTab === 'selected'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <Calendar size={18} />
+              <span className="text-sm font-semibold">{formatDateTab(allFlightData.selectedDate.date)}</span>
+              <span className="text-xs opacity-80">{allFlightData.selectedDate.data.length} uçuş</span>
+            </div>
+          </button>
+
+          {/* Sonraki Gün */}
+          <button
+            onClick={() => handleDateTabClick('next')}
+            className={`flex-1 py-3 px-4 rounded-lg transition-all ${
+              selectedDateTab === 'next'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <Calendar size={18} />
+              <span className="text-sm font-semibold">{formatDateTab(allFlightData.nextDay.date)}</span>
+              <span className="text-xs opacity-80">{allFlightData.nextDay.data.length} uçuş</span>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Uçuş Listesi */}
       {flights.length === 0 ? (
         <div className="bg-red-50 p-4 rounded text-red-600">Aradığınız kriterlere uygun uçuş bulunamadı.</div>
       ) : (
@@ -52,10 +142,10 @@ const SearchResultsPage = () => {
                   <span>{flight.arrivalAirport?.city}</span>
                 </div>
               </div>
-              
+
               <div className="text-right mt-4 md:mt-0">
                 <div className="text-2xl font-bold text-blue-600">{flight.price} ₺</div>
-                <button 
+                <button
                   onClick={() => navigate(`/book/${flight.id}`)}
                   className="mt-2 bg-blue-600 text-white px-6 py-2 rounded-full font-medium hover:bg-blue-700 transition"
                 >
