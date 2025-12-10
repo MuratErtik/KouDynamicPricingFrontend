@@ -6,14 +6,11 @@ const formatDateForApi = (dateObj) => format(dateObj, 'yyyy-MM-dd');
 // Tekil İstek
 const fetchFlightsByDate = async (fromCode, toCode, dateStr) => {
   try {
-    // BURASI ÇOK ÖNEMLİ:
-    // Frontend (fromCode) -> Backend (departureAirportIataCode) eşleşmesi burada yapılır.
     const response = await api.get('/public/flights/search', {
       params: {
         departureAirportIataCode: fromCode, // Parametre eşleşmesi
         arrivalAirportIataCode: toCode,     // Parametre eşleşmesi
         departureDate: dateStr,
-        // Backend 'passengers' parametresi beklemediği için göndermiyoruz.
       },
     });
     return response.data || [];
@@ -25,7 +22,8 @@ const fetchFlightsByDate = async (fromCode, toCode, dateStr) => {
 
 // 3 Günlük Arama Stratejisi
 const searchFlightsWithNeighbors = async (fromCode, toCode, selectedDateStr) => {
-  const selectedDate = new Date(selectedDateStr);
+  const [year, month, day] = selectedDateStr.split('-').map(Number);
+  const selectedDate = new Date(year, month - 1, day);
   const today = startOfToday();
 
   const prevDate = subDays(selectedDate, 1);
