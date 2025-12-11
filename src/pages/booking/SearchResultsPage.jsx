@@ -4,7 +4,6 @@ import flightSearchService from '../../services/flightSearchService';
 import { ArrowRight, Calendar } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import PassengerStepContainer from '../../components/booking/steps/PassengerStepContainer';
 
 const SearchResultsPage = () => {
   const [searchParams] = useSearchParams();
@@ -12,13 +11,11 @@ const SearchResultsPage = () => {
   const [selectedDateTab, setSelectedDateTab] = useState('selected');
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFlight, setSelectedFlight] = useState(null);
   const navigate = useNavigate();
 
   const fromCode = searchParams.get('departureAirportIataCode');
   const toCode = searchParams.get('arrivalAirportIataCode');
   const departureDate = searchParams.get('departureDate');
-  const passengerCount = parseInt(searchParams.get('passengers') || '1', 10);
 
   useEffect(() => {
     const fetchFlights = async () => {
@@ -80,28 +77,6 @@ const SearchResultsPage = () => {
     return `${hours}sa ${minutes}dk`;
   };
 
-
-  const handleFlightSelect = (flight) => {
-    setSelectedFlight(flight);
-
-    // Scroll passenger form into view after state updates
-    setTimeout(() => {
-      const formSection = document.getElementById('passenger-form-section');
-      if (formSection) {
-        formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 100);
-  };
-
-  const handlePassengerInfoComplete = (payload) => {
-    if (!selectedFlight) return;
-    navigate(`/book/${selectedFlight.id}`, {
-      state: {
-        passengerData: payload,
-        selectedFlight,
-      },
-    });
-  };
 
   if (loading) return <div className="text-center mt-20">Uçuşlar aranıyor...</div>;
 
@@ -190,16 +165,13 @@ const SearchResultsPage = () => {
         <div className="space-y-4">
 
           {flights.map((flight) => {
-            const isSelected = selectedFlight?.id === flight.id;
             const dep = new Date(flight.departureTime);
             const arr = new Date(flight.arrivalTime);
 
             return (
               <div
                 key={flight.id}
-                className={`bg-white p-6 rounded-lg shadow hover:shadow-md transition border flex flex-col md:flex-row justify-between items-center ${
-                  isSelected ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-100'
-                }`}
+                className="bg-white p-6 rounded-lg shadow hover:shadow-md transition border border-gray-100 flex flex-col md:flex-row justify-between items-center"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-2">
@@ -233,51 +205,16 @@ const SearchResultsPage = () => {
                     {flight.currentPrice.toFixed(2)} $
                   </div>
                   <button
-                    onClick={() => handleFlightSelect(flight)}
-                    className={`mt-2 px-6 py-2 rounded-full font-medium transition ${
-                      isSelected
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
+                    onClick={() => navigate(`/book/${flight.id}`)}
+                    className="mt-2 bg-blue-600 text-white px-6 py-2 rounded-full font-medium hover:bg-blue-700 transition"
                   >
-                    {isSelected ? 'Seçildi' : 'Seç'}
+                    Seç
                   </button>
                 </div>
               </div>
             );
           })}
 
-        </div>
-      )}
-
-      {selectedFlight && (
-        <div id="passenger-form-section" className="mt-10 space-y-6">
-          <div className="bg-white border border-blue-100 rounded-2xl shadow-sm p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-wide text-gray-500">Seçilen Uçuş</p>
-                <h3 className="text-xl font-bold text-gray-800">#{selectedFlight.flightNumber}</h3>
-                <p className="text-gray-500 text-sm">
-                  {selectedFlight.departureAirport?.city} ({selectedFlight.departureAirport?.iataCode})
-                  {' '}
-                  <ArrowRight size={16} className="inline mx-1 text-blue-500" />
-                  {selectedFlight.arrivalAirport?.city} ({selectedFlight.arrivalAirport?.iataCode})
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-400">Güncel Fiyat</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {selectedFlight.currentPrice?.toFixed(2)} $
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <PassengerStepContainer
-            passengerCount={passengerCount}
-            onNext={handlePassengerInfoComplete}
-            resetKey={selectedFlight.id}
-          />
         </div>
       )}
     </div>
