@@ -4,9 +4,11 @@ import { Search, Calendar, PlaneTakeoff, PlaneLanding, ArrowRight } from 'lucide
 import { toast } from 'react-toastify';
 import AsyncAirportSelect from '../common/AsyncAirportSelect';
 import PassengerCounter from '../common/PassengerCounter';
+import { useBooking } from '../../context/BookingContext';
 
 const HomeSearchSection = () => {
   const navigate = useNavigate();
+  const { updateBookingData } = useBooking();
   
   // --- STATE ---
   const [tripType, setTripType] = useState('one-way');
@@ -41,6 +43,9 @@ const HomeSearchSection = () => {
       toast.warning("Lütfen dönüş tarihini seçiniz.");
       return;
     }
+
+    // Yolcu sayısını context'e kaydet
+    updateBookingData({ passengerCount: passengers });
 
     // URL parametrelerini oluştur
     const queryParams = new URLSearchParams({
