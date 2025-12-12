@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import flightSearchService from '../../services/flightSearchService';
 import { ArrowRight, Calendar } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { useBooking } from '../../context/BookingContext';
 
 const SearchResultsPage = () => {
   const [searchParams] = useSearchParams();
@@ -12,6 +13,7 @@ const SearchResultsPage = () => {
   const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { updateBookingData } = useBooking();
 
   const fromCode = searchParams.get('departureAirportIataCode');
   const toCode = searchParams.get('arrivalAirportIataCode');
@@ -44,11 +46,13 @@ const SearchResultsPage = () => {
     fetchFlights();
   }, [fromCode, toCode, departureDate]);
 
+  // Uçuş seçildiğinde
+  const handleSelectFlight = (flightId) => {
+    updateBookingData({ flightId });
+    navigate('/booking/passenger-info');
+  };
 
-  // ------------------------------------------------------
   // ÜST TARİH BAR BUTONLARI
-  // ------------------------------------------------------
-
   const handleDateTabClick = (tabKey) => {
     setSelectedDateTab(tabKey);
 
@@ -65,11 +69,7 @@ const SearchResultsPage = () => {
     return format(dateObj, "d MMM EEEE", { locale: tr });
   };
 
-
-  // ------------------------------------------------------
   // HELPER: UÇUŞ SÜRESİ
-  // ------------------------------------------------------
-
   const getDuration = (start, end) => {
     const diff = differenceInMinutes(new Date(end), new Date(start));
     const hours = Math.floor(diff / 60);
@@ -77,9 +77,7 @@ const SearchResultsPage = () => {
     return `${hours}sa ${minutes}dk`;
   };
 
-
   if (loading) return <div className="text-center mt-20">Uçuşlar aranıyor...</div>;
-
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
@@ -153,17 +151,13 @@ const SearchResultsPage = () => {
         </div>
       )}
 
-
-      {/* -------------------------------------------------- */}
       {/* UÇUŞ LİSTESİ */}
-      {/* -------------------------------------------------- */}
       {flights.length === 0 ? (
         <div className="bg-red-50 p-4 rounded text-red-600">
           Aradığınız kriterlere uygun uçuş bulunamadı.
         </div>
       ) : (
         <div className="space-y-4">
-
           {flights.map((flight) => {
             const dep = new Date(flight.departureTime);
             const arr = new Date(flight.arrivalTime);
@@ -205,7 +199,7 @@ const SearchResultsPage = () => {
                     {flight.currentPrice.toFixed(2)} $
                   </div>
                   <button
-                    onClick={() => navigate(`/book/${flight.id}`)}
+                    onClick={() => handleSelectFlight(flight.id)}
                     className="mt-2 bg-blue-600 text-white px-6 py-2 rounded-full font-medium hover:bg-blue-700 transition"
                   >
                     Seç
@@ -214,7 +208,6 @@ const SearchResultsPage = () => {
               </div>
             );
           })}
-
         </div>
       )}
     </div>
