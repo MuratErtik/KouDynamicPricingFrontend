@@ -15,6 +15,7 @@ import SignupPage from './pages/auth/SignupPage';
 import SearchResultsPage from './pages/booking/SearchResultsPage';
 import PassengerInfoPage from './pages/booking/PassengerInfoPage'; 
 import SeatSelectionPage from './pages/booking/SeatSelectionPage'; 
+import PnrDetailsPage from './pages/booking/PnrDetailsPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -49,11 +50,14 @@ function App() {
                 <Route path="login" element={<LoginPage />} />
                 <Route path="signup" element={<SignupPage />} />
                 
-                {/* Booking */}
+                {/* Booking Flow */}
                 <Route path="flights" element={<SearchResultsPage />} />
                 <Route path="flights/search" element={<SearchResultsPage />} />
                 <Route path="booking/passenger-info" element={<PassengerInfoPage />} /> 
                 <Route path="booking/seat-selection" element={<SeatSelectionPage />} /> 
+
+                {/* PNR Sorgulama Sonuç Sayfası (YENİ) */}
+                <Route path="pnr-details" element={<PnrDetailsPage />} />
                 
                 {/* Admin */}
                 <Route
