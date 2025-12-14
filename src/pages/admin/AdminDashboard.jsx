@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import adminService from "../../services/adminService";
 import publicService from "../../services/publicService";
 import { toast } from "react-toastify";
-import PriceHistoryModal from '../../components/admin/PriceHistoryModal'; // <--- YENİ MODAL
+import PriceHistoryModal from '../../components/admin/PriceHistoryModal'; 
+import CustomerListModal from '../../components/admin/CustomerListModal'; 
 import { 
   Trash2, 
   Plus, 
@@ -50,6 +51,10 @@ const AdminDashboard = () => {
     arrivalAirportId: "",
     departureTime: "",
   });
+
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [selectedCustomerList, setSelectedCustomerList] = useState([]);
+  const [customerModalFlightNum, setCustomerModalFlightNum] = useState('');
 
   // Update Modal State
   const [editingFlight, setEditingFlight] = useState(null); 
@@ -100,6 +105,20 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error(error);
       toast.error("Fiyat geçmişi alınamadı.");
+    }
+  };
+
+  const handleShowCustomers = async (flightId, flightNumber) => {
+    try {
+        const customers = await adminService.getFlightCustomers(flightId);
+        
+        setSelectedCustomerList(customers);
+        setCustomerModalFlightNum(flightNumber);
+        setIsCustomerModalOpen(true);
+
+    } catch (error) {
+        console.error(error);
+        toast.error("Yolcu listesi alınırken hata oluştu.");
     }
   };
 
@@ -482,6 +501,15 @@ const AdminDashboard = () => {
                   {/* İŞLEM BUTONLARI */}
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex justify-end gap-2">
+
+                      {/* --- YENİ BUTON: YOLCU LİSTESİ (En Solda) --- */}
+                        <button
+                          onClick={() => handleShowCustomers(flight.id, flight.flightNumber)}
+                          className="text-purple-600 bg-white hover:bg-purple-50 p-2 rounded-lg border border-transparent hover:border-purple-100 transition shadow-sm relative group/tooltip"
+                          title="Yolcu Listesi"
+                        >
+                          <Users size={18} />
+                        </button>
                         
                         {/* --- YENİ BUTON: Fiyat Geçmişi Analizi --- */}
                         <button
@@ -635,7 +663,12 @@ const AdminDashboard = () => {
         data={selectedPriceHistory}
         flightNumber={selectedFlightNum}
       />
-
+      <CustomerListModal 
+        isOpen={isCustomerModalOpen}
+        onClose={() => setIsCustomerModalOpen(false)}
+        customers={selectedCustomerList}
+        flightNumber={customerModalFlightNum}
+      />
     </div>
   );
 };
