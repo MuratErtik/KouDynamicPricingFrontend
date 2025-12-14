@@ -58,10 +58,16 @@ const getFlightById = async (id) => {
   return response.data;
 };
 
+const getPriceHistory = async (flightId) => {
+  const response = await api.get(`/admin/price-history/${flightId}`);
+  return response.data;
+};
+
 export default {
   getAllFlights,
   createFlight,
-  searchFlights, // <--- Export etmeyi unutma
+  getPriceHistory,
+  searchFlights, 
   deleteFlight,
   updateFlight,
   getFlightById
