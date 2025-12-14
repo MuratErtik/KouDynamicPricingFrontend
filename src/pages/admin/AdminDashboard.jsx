@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import adminService from "../../services/adminService";
 import publicService from "../../services/publicService";
 import { toast } from "react-toastify";
+import PriceHistoryModal from '../../components/admin/PriceHistoryModal'; // <--- YENİ MODAL
 import { 
   Trash2, 
   Plus, 
@@ -16,9 +17,10 @@ import {
   Edit,
   X,
   Save,
-  Search,       // <--- YENİ EKLENDİ
-  Filter,       // <--- YENİ EKLENDİ
-  RotateCcw     // <--- YENİ EKLENDİ
+  Search,
+  Filter,
+  RotateCcw,
+  LineChart // <--- YENİ İKON
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -29,8 +31,8 @@ const AdminDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // --- SEARCH / FILTER STATE (YENİ) ---
-  const [showFilter, setShowFilter] = useState(false); // Paneli aç/kapa
+  // Search / Filter State
+  const [showFilter, setShowFilter] = useState(false);
   const [searchParams, setSearchParams] = useState({
     departureCity: "",
     arrivalCity: "",
@@ -49,12 +51,17 @@ const AdminDashboard = () => {
     departureTime: "",
   });
 
-  // --- UPDATE MODAL STATE ---
+  // Update Modal State
   const [editingFlight, setEditingFlight] = useState(null); 
   const [updateForm, setUpdateForm] = useState({
     newDepartureTime: "",
     status: "SCHEDULED"
   });
+
+  // --- YENİ STATE: Fiyat Geçmişi Modalı ---
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+  const [selectedPriceHistory, setSelectedPriceHistory] = useState(null);
+  const [selectedFlightNum, setSelectedFlightNum] = useState('');
 
   useEffect(() => {
     loadData();
@@ -75,7 +82,28 @@ const AdminDashboard = () => {
     }
   };
 
-  // --- SEARCH FONKSİYONLARI (YENİ) ---
+  // --- YENİ FONKSİYON: Fiyat Geçmişini Getir ---
+  const handleShowPriceHistory = async (flightId, flightNumber) => {
+    try {
+      // Servisten veriyi çek
+      const historyData = await adminService.getPriceHistory(flightId);
+      
+      if (!historyData || historyData.priceHistories.length === 0) {
+        toast.info("Bu uçuş için henüz fiyat geçmişi verisi yok.");
+        return;
+      }
+
+      setSelectedPriceHistory(historyData);
+      setSelectedFlightNum(flightNumber);
+      setIsPriceModalOpen(true);
+      
+    } catch (error) {
+      console.error(error);
+      toast.error("Fiyat geçmişi alınamadı.");
+    }
+  };
+
+  // --- SEARCH FONKSİYONLARI ---
   const handleSearchChange = (e) => {
     const { name, value, type, checked } = e.target;
     setSearchParams(prev => ({
@@ -88,10 +116,9 @@ const AdminDashboard = () => {
     e.preventDefault();
     try {
         const results = await adminService.searchFlights(searchParams);
-        // Gelen sonuçları tarihe göre sırala
         const sortedResults = results.sort((a, b) => new Date(b.departureTime) - new Date(a.departureTime));
         setFlights(sortedResults);
-        setCurrentPage(1); // Arama yapınca 1. sayfaya dön
+        setCurrentPage(1);
         toast.info(`${results.length} uçuş bulundu.`);
     } catch (error) {
         console.error(error);
@@ -110,7 +137,7 @@ const AdminDashboard = () => {
         status: "",
         onlyFutureFlights: false
     });
-    loadData(); // Tüm verileri geri yükle
+    loadData();
   };
 
   // --- CRUD İŞLEMLERİ ---
@@ -276,7 +303,7 @@ const AdminDashboard = () => {
         </form>
       </div>
 
-      {/* --- ADVANCED SEARCH FILTER (YENİ KISIM) --- */}
+      {/* --- ADVANCED SEARCH FILTER --- */}
       <div className="mb-6">
         <button 
             onClick={() => setShowFilter(!showFilter)}
@@ -289,7 +316,6 @@ const AdminDashboard = () => {
             <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 animate-in fade-in slide-in-from-top-2">
                 <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     
-                    {/* Şehir Aramaları */}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Kalkış Şehri</label>
                         <input type="text" name="departureCity" value={searchParams.departureCity} onChange={handleSearchChange} placeholder="Örn: Istanbul" className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
@@ -298,15 +324,10 @@ const AdminDashboard = () => {
                         <label className="block text-xs font-bold text-gray-500 mb-1">Varış Şehri</label>
                         <input type="text" name="arrivalCity" value={searchParams.arrivalCity} onChange={handleSearchChange} placeholder="Örn: London" className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
-
-                    {/* Tarih Aralığı */}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Uçuş Tarihi</label>
                         <input type="datetime-local" name="departureTimeStart" value={searchParams.departureTimeStart} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
-
-
-                    {/* Fiyat Aralığı */}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Min Fiyat ($)</label>
                         <input type="number" name="basePriceMin" value={searchParams.basePriceMin} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
@@ -315,8 +336,6 @@ const AdminDashboard = () => {
                         <label className="block text-xs font-bold text-gray-500 mb-1">Max Fiyat ($)</label>
                         <input type="number" name="basePriceMax" value={searchParams.basePriceMax} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                     </div>
-
-                    {/* Durum */}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Durum</label>
                         <select name="status" value={searchParams.status} onChange={handleSearchChange} className="w-full border p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
@@ -327,8 +346,6 @@ const AdminDashboard = () => {
                             <option value="COMPLETED">COMPLETED</option>
                         </select>
                     </div>
-
-                    {/* Gelecek Uçuşlar Checkbox */}
                     <div className="flex items-center gap-2 mt-4 md:mt-6">
                         <input 
                             type="checkbox" 
@@ -341,7 +358,6 @@ const AdminDashboard = () => {
                         <label htmlFor="future" className="text-sm text-gray-700 cursor-pointer">Sadece Gelecek Uçuşlar</label>
                     </div>
 
-                    {/* Butonlar */}
                     <div className="md:col-span-4 flex justify-end gap-3 mt-2 border-t pt-4">
                         <button type="button" onClick={handleClearSearch} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">
                             <RotateCcw size={16}/> Filtreleri Temizle
@@ -466,19 +482,29 @@ const AdminDashboard = () => {
                   {/* İŞLEM BUTONLARI */}
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex justify-end gap-2">
-                        {/* UPDATE BUTTON */}
+                        
+                        {/* --- YENİ BUTON: Fiyat Geçmişi Analizi --- */}
+                        <button
+                          onClick={() => handleShowPriceHistory(flight.id, flight.flightNumber)}
+                          className="text-green-600 bg-white hover:bg-green-50 p-2 rounded-lg border border-transparent hover:border-green-100 transition shadow-sm relative group/tooltip"
+                          title="Fiyat Analizi"
+                        >
+                          <LineChart size={18} />
+                        </button>
+
+                        {/* Düzenle */}
                         <button
                           onClick={() => handleEditClick(flight)}
-                          className="text-gray-400 hover:text-blue-600 bg-white hover:bg-blue-50 p-2 rounded-lg border border-transparent hover:border-blue-100 transition shadow-sm"
+                          className="text-blue-600 bg-white hover:bg-blue-50 p-2 rounded-lg border border-transparent hover:border-blue-100 transition shadow-sm"
                           title="Düzenle"
                         >
                           <Edit size={18} />
                         </button>
 
-                        {/* DELETE BUTTON */}
+                        {/* Sil */}
                         <button
                           onClick={() => handleDelete(flight.id)}
-                          className="text-gray-400 hover:text-red-600 bg-white hover:bg-red-50 p-2 rounded-lg border border-transparent hover:border-red-100 transition shadow-sm"
+                          className="text-red-600 bg-white hover:bg-red-50 p-2 rounded-lg border border-transparent hover:border-red-100 transition shadow-sm"
                           title="Uçuşu Sil"
                         >
                           <Trash2 size={18} />
@@ -491,7 +517,7 @@ const AdminDashboard = () => {
           </table>
         </div>
 
-        {/* Pagination Footer */}
+        {/* Pagination */}
         {flights.length > itemsPerPage && (
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <span className="text-sm text-gray-500">
@@ -532,11 +558,10 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {/* --- UPDATE MODAL (POPUP) --- */}
+      {/* --- UPDATE MODAL --- */}
       {editingFlight && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-gray-100 scale-100 animate-in zoom-in-95 duration-200">
-                {/* Modal Header */}
                 <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                         <Edit size={20}/> Uçuş Düzenle
@@ -548,11 +573,7 @@ const AdminDashboard = () => {
                         <X size={20}/>
                     </button>
                 </div>
-
-                {/* Modal Body */}
                 <form onSubmit={handleUpdateSubmit} className="p-6 space-y-4">
-                    
-                    {/* Bilgi Kartı (Sadece Okunur) */}
                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
                          <div className="flex justify-between items-center mb-1">
                              <span className="text-xs font-bold text-blue-600 uppercase">Uçuş No</span>
@@ -564,8 +585,6 @@ const AdminDashboard = () => {
                              <span>{editingFlight.arrivalAirport.city} ({editingFlight.arrivalAirport.iataCode})</span>
                          </div>
                     </div>
-
-                    {/* Tarih Değiştirme */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Yeni Tarih ve Saat</label>
                         <input
@@ -576,8 +595,6 @@ const AdminDashboard = () => {
                             required
                         />
                     </div>
-
-                    {/* Durum Değiştirme */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Uçuş Durumu</label>
                         <select
@@ -591,8 +608,6 @@ const AdminDashboard = () => {
                             <option value="COMPLETED">COMPLETED (Tamamlandı)</option>
                         </select>
                     </div>
-
-                    {/* Butonlar */}
                     <div className="flex gap-3 mt-6 pt-2">
                         <button
                             type="button"
@@ -608,11 +623,18 @@ const AdminDashboard = () => {
                             <Save size={18}/> Kaydet
                         </button>
                     </div>
-
                 </form>
             </div>
         </div>
       )}
+
+      {/* --- PRICE HISTORY MODAL (YENİ) --- */}
+      <PriceHistoryModal 
+        isOpen={isPriceModalOpen}
+        onClose={() => setIsPriceModalOpen(false)}
+        data={selectedPriceHistory}
+        flightNumber={selectedFlightNum}
+      />
 
     </div>
   );
