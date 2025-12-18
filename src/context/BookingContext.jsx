@@ -12,14 +12,53 @@ export const useBooking = () => {
 
 export const BookingProvider = ({ children }) => {
   const [bookingData, setBookingData] = useState({
-    flightId: null,
+    // Uçuş Arama Bilgileri
+    tripType: 'one-way', // 'one-way' veya 'round-trip'
+    departureAirportIataCode: null,
+    arrivalAirportIataCode: null,
+    departureDate: null,
+    returnDate: null, // Gidiş-dönüş için
     passengerCount: 1,
+    
+    // Seçilen Uçuşlar
+    selectedDepartureFlight: null, // Gidiş uçuşu
+    selectedReturnFlight: null,    // Dönüş uçuşu (varsa)
+    
+    // Yolcu ve Koltuk Bilgileri
+    flightId: null, // Tek yön için
     contactEmail: '',
     passengers: []
   });
 
   const updateBookingData = (data) => {
     setBookingData(prev => ({ ...prev, ...data }));
+  };
+
+  const setSearchCriteria = (criteria) => {
+    setBookingData(prev => ({
+      ...prev,
+      tripType: criteria.tripType || prev.tripType,
+      departureAirportIataCode: criteria.departureAirportIataCode,
+      arrivalAirportIataCode: criteria.arrivalAirportIataCode,
+      departureDate: criteria.departureDate,
+      returnDate: criteria.returnDate,
+      passengerCount: criteria.passengerCount
+    }));
+  };
+
+  const selectDepartureFlight = (flight) => {
+    setBookingData(prev => ({
+      ...prev,
+      selectedDepartureFlight: flight,
+      flightId: flight.id // Backward compatibility
+    }));
+  };
+
+  const selectReturnFlight = (flight) => {
+    setBookingData(prev => ({
+      ...prev,
+      selectedReturnFlight: flight
+    }));
   };
 
   const addPassenger = (passenger) => {
@@ -42,8 +81,15 @@ export const BookingProvider = ({ children }) => {
 
   const resetBooking = () => {
     setBookingData({
-      flightId: null,
+      tripType: 'one-way',
+      departureAirportIataCode: null,
+      arrivalAirportIataCode: null,
+      departureDate: null,
+      returnDate: null,
       passengerCount: 1,
+      selectedDepartureFlight: null,
+      selectedReturnFlight: null,
+      flightId: null,
       contactEmail: '',
       passengers: []
     });
@@ -54,6 +100,9 @@ export const BookingProvider = ({ children }) => {
       value={{
         bookingData,
         updateBookingData,
+        setSearchCriteria,
+        selectDepartureFlight,
+        selectReturnFlight,
         addPassenger,
         updatePassenger,
         setContactEmail,
