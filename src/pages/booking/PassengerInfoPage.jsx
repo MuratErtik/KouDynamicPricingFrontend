@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
-import { User, Mail, Phone, Calendar, CreditCard, CheckCircle2 } from 'lucide-react';
+import { User, Mail, Phone, Calendar, CreditCard, CheckCircle2, Plane, ArrowRight, Percent } from 'lucide-react'; // Percent eklendi
 import { toast } from 'react-toastify';
+import { format } from 'date-fns';
 
 const PassengerInfoPage = () => {
   const navigate = useNavigate();
-  const { bookingData, updateBookingData } = useBooking();
-  const [passengers, setPassengers] = useState([]);
+  const { bookingData, updatePassengers, setContactEmail } = useBooking();
+  const [passengers, setPassengersState] = useState([]);
   const [contactEmailIndex, setContactEmailIndex] = useState(null);
 
   useEffect(() => {
@@ -19,19 +20,19 @@ const PassengerInfoPage = () => {
       birthDate: '',
       email: '',
       phone: '',
-      selectedSeatNumber: '' // Şimdilik boş, koltuk seçiminde dolacak
+      outboundSeatNumber: null,
+      returnSeatNumber: null
     }));
-    setPassengers(initialPassengers);
+    setPassengersState(initialPassengers);
   }, [bookingData.passengerCount]);
 
   const handleInputChange = (index, field, value) => {
     const updatedPassengers = [...passengers];
     updatedPassengers[index][field] = value;
-    setPassengers(updatedPassengers);
+    setPassengersState(updatedPassengers);
   };
 
   const handleContactEmailSelect = (index) => {
-    // Sadece bir kişi seçilebilir
     setContactEmailIndex(index);
   };
 
@@ -77,22 +78,121 @@ const PassengerInfoPage = () => {
     const contactEmail = passengers[contactEmailIndex].email;
 
     // Context'e kaydet
-    updateBookingData({
-      passengers,
-      contactEmail
-    });
+    updatePassengers(passengers);
+    setContactEmail(contactEmail);
 
     // Koltuk seçimi sayfasına yönlendir
     navigate('/booking/seat-selection');
   };
 
+  // --- FİYAT GÖSTERİM BİLEŞENİ (Helper) ---
+  const PriceDisplay = ({ currentPrice, discountPrice, baseColor = "text-blue-600" }) => {
+    const hasDiscount = discountPrice !== null && discountPrice !== undefined && discountPrice > 0;
+
+    if (hasDiscount) {
+      return (
+        <div className="flex flex-col items-end">
+          {/* Eski Fiyat */}
+          <span className="text-sm text-gray-400 line-through decoration-red-500 decoration-1 font-medium">
+            ${currentPrice.toFixed(2)}
+          </span>
+          {/* Yeni Fiyat */}
+          <div className="text-xl font-bold text-green-600 flex items-center gap-1">
+             ${discountPrice.toFixed(2)}
+             <Percent size={16} className="animate-pulse" />
+          </div>
+        </div>
+      );
+    }
+
+    // İndirim yoksa
+    return (
+      <p className={`text-xl font-bold ${baseColor}`}>
+        ${currentPrice.toFixed(2)}
+      </p>
+    );
+  };
+  // ----------------------------------------
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8">
       <div className="container mx-auto px-4 max-w-5xl">
         
-        {/* BAŞLIK */}
+        {/* BAŞLIK VE UÇUŞ BİLGİLERİ */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Yolcu Bilgileri</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-4">Yolcu Bilgileri</h1>
+          
+          {/* Seçilen Uçuşlar Özeti */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Seçilen Uçuşlar</h3>
+            
+            <div className="space-y-4">
+              {/* Gidiş Uçuşu */}
+              {bookingData.outboundFlight && (
+                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="flex items-center gap-4">
+                    <Plane className="text-blue-600" size={24} />
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Gidiş Uçuşu</p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-bold text-gray-800">
+                          {format(new Date(bookingData.outboundFlight.departureTime), "HH:mm")}
+                        </span>
+                        <ArrowRight className="text-gray-400" size={16} />
+                        <span className="text-lg font-bold text-gray-800">
+                          {format(new Date(bookingData.outboundFlight.arrivalTime), "HH:mm")}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {bookingData.outboundFlight.departureAirport.city} → {bookingData.outboundFlight.arrivalAirport.city}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {/* Fiyat Gösterimi - Gidiş (Mavi Tema) */}
+                    <PriceDisplay 
+                      currentPrice={bookingData.outboundFlight.currentPrice} 
+                      discountPrice={bookingData.outboundFlight.discountPrice}
+                      baseColor="text-blue-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Dönüş Uçuşu */}
+              {bookingData.returnFlight && (
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
+                  <div className="flex items-center gap-4">
+                    <Plane className="text-green-600 rotate-180" size={24} />
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Dönüş Uçuşu</p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-bold text-gray-800">
+                          {format(new Date(bookingData.returnFlight.departureTime), "HH:mm")}
+                        </span>
+                        <ArrowRight className="text-gray-400" size={16} />
+                        <span className="text-lg font-bold text-gray-800">
+                          {format(new Date(bookingData.returnFlight.arrivalTime), "HH:mm")}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {bookingData.returnFlight.departureAirport.city} → {bookingData.returnFlight.arrivalAirport.city}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {/* Fiyat Gösterimi - Dönüş (Yeşil Tema) */}
+                    <PriceDisplay 
+                      currentPrice={bookingData.returnFlight.currentPrice} 
+                      discountPrice={bookingData.returnFlight.discountPrice}
+                      baseColor="text-green-600"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           <p className="text-gray-600">Lütfen tüm yolcuların bilgilerini eksiksiz doldurun.</p>
         </div>
 
