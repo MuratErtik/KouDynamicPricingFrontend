@@ -12,22 +12,25 @@ export const useBooking = () => {
 
 export const BookingProvider = ({ children }) => {
   const [bookingData, setBookingData] = useState({
-    // Uçuş Arama Bilgileri
+    // Arama Kriterleri
     tripType: 'one-way', // 'one-way' veya 'round-trip'
     departureAirportIataCode: null,
     arrivalAirportIataCode: null,
     departureDate: null,
-    returnDate: null, // Gidiş-dönüş için
+    returnDate: null,
     passengerCount: 1,
     
     // Seçilen Uçuşlar
-    selectedDepartureFlight: null, // Gidiş uçuşu
-    selectedReturnFlight: null,    // Dönüş uçuşu (varsa)
+    outboundFlight: null,  // Gidiş uçuşu
+    returnFlight: null,    // Dönüş uçuşu
     
-    // Yolcu ve Koltuk Bilgileri
-    flightId: null, // Tek yön için
+    // Yolcu Bilgileri
     contactEmail: '',
-    passengers: []
+    passengers: [], // Her yolcu: { firstName, lastName, identityNumber, birthDate, email, phone, outboundSeatNumber, returnSeatNumber }
+    
+    // Koltuk Seçim Durumu
+    outboundSeatsSelected: false,
+    returnSeatsSelected: false
   });
 
   const updateBookingData = (data) => {
@@ -46,37 +49,37 @@ export const BookingProvider = ({ children }) => {
     }));
   };
 
-  const selectDepartureFlight = (flight) => {
+  const selectOutboundFlight = (flight) => {
     setBookingData(prev => ({
       ...prev,
-      selectedDepartureFlight: flight,
-      flightId: flight.id // Backward compatibility
+      outboundFlight: flight
     }));
   };
 
   const selectReturnFlight = (flight) => {
     setBookingData(prev => ({
       ...prev,
-      selectedReturnFlight: flight
+      returnFlight: flight
     }));
   };
 
-  const addPassenger = (passenger) => {
+  const updatePassengers = (passengers) => {
     setBookingData(prev => ({
       ...prev,
-      passengers: [...prev.passengers, passenger]
-    }));
-  };
-
-  const updatePassenger = (index, passenger) => {
-    setBookingData(prev => ({
-      ...prev,
-      passengers: prev.passengers.map((p, i) => i === index ? passenger : p)
+      passengers
     }));
   };
 
   const setContactEmail = (email) => {
     setBookingData(prev => ({ ...prev, contactEmail: email }));
+  };
+
+  const setOutboundSeatsSelected = (status) => {
+    setBookingData(prev => ({ ...prev, outboundSeatsSelected: status }));
+  };
+
+  const setReturnSeatsSelected = (status) => {
+    setBookingData(prev => ({ ...prev, returnSeatsSelected: status }));
   };
 
   const resetBooking = () => {
@@ -87,12 +90,44 @@ export const BookingProvider = ({ children }) => {
       departureDate: null,
       returnDate: null,
       passengerCount: 1,
-      selectedDepartureFlight: null,
-      selectedReturnFlight: null,
-      flightId: null,
+      outboundFlight: null,
+      returnFlight: null,
       contactEmail: '',
-      passengers: []
+      passengers: [],
+      outboundSeatsSelected: false,
+      returnSeatsSelected: false
     });
+  };
+
+  // Uçuş seçimlerini sıfırlama (kullanıcı geri dönüp değiştirmek isterse)
+  const resetFlightSelection = () => {
+    setBookingData(prev => ({
+      ...prev,
+      outboundFlight: null,
+      returnFlight: null,
+      passengers: [],
+      contactEmail: '',
+      outboundSeatsSelected: false,
+      returnSeatsSelected: false
+    }));
+  };
+
+  const resetOutboundFlight = () => {
+    setBookingData(prev => ({
+      ...prev,
+      outboundFlight: null,
+      passengers: prev.passengers.map(p => ({ ...p, outboundSeatNumber: null })),
+      outboundSeatsSelected: false
+    }));
+  };
+
+  const resetReturnFlight = () => {
+    setBookingData(prev => ({
+      ...prev,
+      returnFlight: null,
+      passengers: prev.passengers.map(p => ({ ...p, returnSeatNumber: null })),
+      returnSeatsSelected: false
+    }));
   };
 
   return (
@@ -101,12 +136,16 @@ export const BookingProvider = ({ children }) => {
         bookingData,
         updateBookingData,
         setSearchCriteria,
-        selectDepartureFlight,
+        selectOutboundFlight,
         selectReturnFlight,
-        addPassenger,
-        updatePassenger,
+        updatePassengers,
         setContactEmail,
-        resetBooking
+        setOutboundSeatsSelected,
+        setReturnSeatsSelected,
+        resetBooking,
+        resetFlightSelection,
+        resetOutboundFlight,
+        resetReturnFlight
       }}
     >
       {children}
