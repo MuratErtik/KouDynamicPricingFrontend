@@ -1,12 +1,10 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8080/api/public';
+import api from './api';
 
 const seatService = {
   // Uçuşa ait koltukları getir
   getSeats: async (flightId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/seats/${flightId}`);
+      const response = await api.get(`/public/seats/${flightId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching seats:', error);
@@ -14,10 +12,11 @@ const seatService = {
     }
   },
 
-  // Bilet satın alma
+  // Bilet satın alma (CreateBookingRequest)
   buyTicket: async (bookingData) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/tickets/buy`, bookingData);
+      
+      const response = await api.post('/public/tickets/buy', bookingData);
       return response.data;
     } catch (error) {
       console.error('Error buying ticket:', error);
