@@ -2,31 +2,51 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../../context/BookingContext';
 import seatService from '../../services/seatService';
-import { Plane, CheckCircle2, X, User, MapPin } from 'lucide-react';
+import { Plane, CheckCircle2, X, User, MapPin, ArrowRight } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { format } from 'date-fns';
 
 const SeatSelectionPage = () => {
   const navigate = useNavigate();
-  const { bookingData, updateBookingData } = useBooking();
-  const [seats, setSeats] = useState([]);
-  const [selectedSeats, setSelectedSeats] = useState({});
+  const { bookingData, updatePassengers, setOutboundSeatsSelected, setReturnSeatsSelected, resetBooking } = useBooking();
+  
+  const [currentStep, setCurrentStep] = useState('outbound'); // 'outbound' veya 'return'
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  
+  // Gidiş koltukları
+  const [outboundSeats, setOutboundSeats] = useState([]);
+  const [selectedOutboundSeats, setSelectedOutboundSeats] = useState({});
+  
+  // Dönüş koltukları
+  const [returnSeats, setReturnSeats] = useState([]);
+  const [selectedReturnSeats, setSelectedReturnSeats] = useState({});
+
+  // Başarı modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [purchaseResult, setPurchaseResult] = useState(null);
+
+  const isRoundTrip = bookingData.tripType === 'round-trip';
 
   // Koltukları yükle
   useEffect(() => {
     const fetchSeats = async () => {
       try {
-        if (!bookingData.flightId) {
+        if (!bookingData.outboundFlight) {
           toast.error('Uçuş seçilmedi!');
           navigate('/');
           return;
         }
 
-        const seatData = await seatService.getSeats(bookingData.flightId);
-        setSeats(seatData);
+        // Gidiş uçuşu koltukları
+        const outboundSeatData = await seatService.getSeats(bookingData.outboundFlight.id);
+        setOutboundSeats(outboundSeatData);
+
+        // Dönüş uçuşu varsa koltukları yükle
+        if (isRoundTrip && bookingData.returnFlight) {
+          const returnSeatData = await seatService.getSeats(bookingData.returnFlight.id);
+          setReturnSeats(returnSeatData);
+        }
       } catch (error) {
         toast.error('Koltuklar yüklenirken hata oluştu');
         console.error(error);
@@ -36,31 +56,34 @@ const SeatSelectionPage = () => {
     };
 
     fetchSeats();
-  }, [bookingData.flightId, navigate]);
+  }, [bookingData.outboundFlight, bookingData.returnFlight, isRoundTrip, navigate]);
 
-  // Koltuk seçimi
-  const handleSeatClick = (seat) => {
+  // Koltuk seçimi handler'ı
+  const handleSeatClick = (seat, isOutbound) => {
     if (seat.status === 'BOOKED') return;
 
-    const currentSelections = Object.keys(selectedSeats);
-    const isAlreadySelected = currentSelections.some(
-      (passengerId) => selectedSeats[passengerId] === seat.seatNumber
+    const currentSelections = isOutbound ? selectedOutboundSeats : selectedReturnSeats;
+    const setSelections = isOutbound ? setSelectedOutboundSeats : setSelectedReturnSeats;
+
+    const currentKeys = Object.keys(currentSelections);
+    const isAlreadySelected = currentKeys.some(
+      (passengerId) => currentSelections[passengerId] === seat.seatNumber
     );
 
     if (isAlreadySelected) {
       // Koltuğu kaldır
-      const newSelections = { ...selectedSeats };
+      const newSelections = { ...currentSelections };
       const passengerIdToRemove = Object.keys(newSelections).find(
         (id) => newSelections[id] === seat.seatNumber
       );
       delete newSelections[passengerIdToRemove];
-      setSelectedSeats(newSelections);
+      setSelections(newSelections);
     } else {
       // Yeni koltuk seç
-      if (currentSelections.length < bookingData.passengerCount) {
-        const nextPassengerIndex = currentSelections.length;
-        setSelectedSeats({
-          ...selectedSeats,
+      if (currentKeys.length < bookingData.passengerCount) {
+        const nextPassengerIndex = currentKeys.length;
+        setSelections({
+          ...currentSelections,
           [nextPassengerIndex]: seat.seatNumber
         });
       } else {
@@ -70,9 +93,10 @@ const SeatSelectionPage = () => {
   };
 
   // Koltuk durumunu belirle
-  const getSeatStatus = (seat) => {
+  const getSeatStatus = (seat, isOutbound) => {
     if (seat.status === 'BOOKED') return 'booked';
     
+    const selectedSeats = isOutbound ? selectedOutboundSeats : selectedReturnSeats;
     const isSelected = Object.values(selectedSeats).includes(seat.seatNumber);
     if (isSelected) return 'selected';
     
@@ -93,34 +117,63 @@ const SeatSelectionPage = () => {
     }
   };
 
-  // Koltuğu hangi yolcu seçti?
-  const getPassengerForSeat = (seatNumber) => {
+  // Hangi yolcu seçti?
+  const getPassengerForSeat = (seatNumber, isOutbound) => {
+    const selectedSeats = isOutbound ? selectedOutboundSeats : selectedReturnSeats;
     const passengerIndex = Object.keys(selectedSeats).find(
       (id) => selectedSeats[id] === seatNumber
     );
     return passengerIndex !== undefined ? parseInt(passengerIndex) : null;
   };
 
-  // Satın alma
-  const handlePurchase = async () => {
-    if (Object.keys(selectedSeats).length !== bookingData.passengerCount) {
-      toast.warning('Lütfen tüm yolcular için koltuk seçin!');
+  // Koltuğları satırlara göre grupla
+  const groupSeatsByRow = (seats) => {
+    const rows = {};
+    seats.forEach((seat) => {
+      const row = seat.seatNumber.slice(0, -1);
+      if (!rows[row]) rows[row] = [];
+      rows[row].push(seat);
+    });
+    return rows;
+  };
+
+  // Gidiş koltukları onaylandı
+  const handleConfirmOutbound = () => {
+    if (Object.keys(selectedOutboundSeats).length !== bookingData.passengerCount) {
+      toast.warning('Lütfen tüm yolcular için gidiş koltuğu seçin!');
       return;
     }
 
+    setOutboundSeatsSelected(true);
+
+    if (isRoundTrip) {
+      setCurrentStep('return');
+      toast.success('Gidiş koltukları seçildi! Şimdi dönüş koltukları seçin.');
+    } else {
+      // Tek yön ise direkt satın al
+      handlePurchase();
+    }
+  };
+
+  // Satın alma
+  const handlePurchase = async () => {
     setPurchasing(true);
 
     try {
       // Yolcu verilerini güncelle (koltuk numaralarını ekle)
       const updatedPassengers = bookingData.passengers.map((passenger, index) => ({
         ...passenger,
-        selectedSeatNumber: selectedSeats[index]
+        outboundSeatNumber: selectedOutboundSeats[index],
+        returnSeatNumber: isRoundTrip ? selectedReturnSeats[index] : null
       }));
 
+      // Backend'e gönderilecek data (CreateBookingRequest)
       const purchaseData = {
-        flightId: bookingData.flightId,
+        outboundFlightId: bookingData.outboundFlight.id,
+        returnFlightId: isRoundTrip ? bookingData.returnFlight?.id : null,
         contactEmail: bookingData.contactEmail,
-        passengers: updatedPassengers
+        passengers: updatedPassengers,
+        isRoundTrip: isRoundTrip
       };
 
       const result = await seatService.buyTicket(purchaseData);
@@ -134,19 +187,12 @@ const SeatSelectionPage = () => {
     }
   };
 
-  // Koltukları satırlara göre grupla
-  const groupSeatsByRow = () => {
-    const rows = {};
-    seats.forEach((seat) => {
-      const row = seat.seatNumber.slice(0, -1); // "1A" -> "1"
-      if (!rows[row]) rows[row] = [];
-      rows[row].push(seat);
-    });
-    return rows;
+  // Ana sayfaya dön ve context'i temizle
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    resetBooking();
+    navigate('/');
   };
-
-  const seatRows = groupSeatsByRow();
-  const rowNumbers = Object.keys(seatRows).sort((a, b) => parseInt(a) - parseInt(b));
 
   if (loading) {
     return (
@@ -159,19 +205,48 @@ const SeatSelectionPage = () => {
     );
   }
 
+  const isShowingOutbound = currentStep === 'outbound';
+  const currentSeats = isShowingOutbound ? outboundSeats : returnSeats;
+  const currentSelectedSeats = isShowingOutbound ? selectedOutboundSeats : selectedReturnSeats;
+  const seatRows = groupSeatsByRow(currentSeats);
+  const rowNumbers = Object.keys(seatRows).sort((a, b) => parseInt(a) - parseInt(b));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
         
-        {/* BAŞLIK */}
+        {/* BAŞLIK VE İLERLEME */}
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-3">
             <Plane className="text-blue-600" size={32} />
             Koltuk Seçimi
           </h1>
           <p className="text-gray-600">
-            {bookingData.passengerCount} yolcu için koltuk seçin
+            {isRoundTrip ? (isShowingOutbound ? 'Gidiş uçuşu için koltuk seçin' : 'Dönüş uçuşu için koltuk seçin') : 'Yolcularınız için koltuk seçin'}
           </p>
+
+          {/* Gidiş-Dönüş İlerleme */}
+          {isRoundTrip && (
+            <div className="flex items-center justify-center gap-6 mt-6">
+              <div className={`flex items-center gap-2 ${isShowingOutbound ? 'text-blue-600' : 'text-green-600'}`}>
+                {isShowingOutbound ? (
+                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">1</div>
+                ) : (
+                  <CheckCircle2 className="text-green-600" size={32} />
+                )}
+                <span className="font-bold">Gidiş Koltukları</span>
+              </div>
+
+              <ArrowRight className="text-gray-400" size={24} />
+
+              <div className={`flex items-center gap-2 ${!isShowingOutbound ? 'text-blue-600' : 'text-gray-400'}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${!isShowingOutbound ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                  2
+                </div>
+                <span className="font-bold">Dönüş Koltukları</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -183,7 +258,15 @@ const SeatSelectionPage = () => {
               {/* Uçak Başı */}
               <div className="bg-gradient-to-b from-blue-600 to-blue-700 text-white rounded-t-3xl py-4 mb-6 -mx-8 -mt-8 text-center">
                 <Plane className="mx-auto mb-2" size={32} />
-                <p className="font-bold">Uçak Başı</p>
+                <p className="font-bold">
+                  {isShowingOutbound ? 'Gidiş Uçuşu' : 'Dönüş Uçuşu'}
+                </p>
+                <p className="text-sm opacity-90">
+                  {isShowingOutbound 
+                    ? `${bookingData.outboundFlight.departureAirport.city} → ${bookingData.outboundFlight.arrivalAirport.city}`
+                    : `${bookingData.returnFlight.departureAirport.city} → ${bookingData.returnFlight.arrivalAirport.city}`
+                  }
+                </p>
               </div>
 
               {/* Koltuk Düzeni */}
@@ -195,7 +278,6 @@ const SeatSelectionPage = () => {
 
                   return (
                     <div key={rowNum} className="flex items-center gap-2">
-                      {/* Sıra Numarası */}
                       <div className="w-8 text-center font-bold text-gray-600 text-sm">
                         {rowNum}
                       </div>
@@ -203,16 +285,16 @@ const SeatSelectionPage = () => {
                       {/* Sol Koltuklar (A, B, C) */}
                       <div className="flex gap-2">
                         {rowSeats.slice(0, 3).map((seat) => {
-                          const status = getSeatStatus(seat);
-                          const passengerIndex = getPassengerForSeat(seat.seatNumber);
+                          const status = getSeatStatus(seat, isShowingOutbound);
+                          const passengerIndex = getPassengerForSeat(seat.seatNumber, isShowingOutbound);
                           
                           return (
                             <button
                               key={seat.id}
-                              onClick={() => handleSeatClick(seat)}
+                              onClick={() => handleSeatClick(seat, isShowingOutbound)}
                               disabled={status === 'booked'}
                               className={`w-12 h-12 rounded-lg font-bold text-white text-sm transition-all transform hover:scale-105 ${getSeatColor(status)} flex items-center justify-center relative`}
-                              title={`${seat.seatNumber} - ${status === 'booked' ? 'Dolu' : status === 'selected' ? 'Seçildi' : 'Uygun'}`}
+                              title={`${seat.seatNumber}`}
                             >
                               {seat.seatNumber.slice(-1)}
                               {passengerIndex !== null && (
@@ -226,23 +308,21 @@ const SeatSelectionPage = () => {
                       </div>
 
                       {/* Koridor */}
-                      <div className="w-8 text-center text-gray-400 text-xs font-bold">
-                        ||
-                      </div>
+                      <div className="w-8 text-center text-gray-400 text-xs font-bold">||</div>
 
                       {/* Sağ Koltuklar (D, E, F) */}
                       <div className="flex gap-2">
                         {rowSeats.slice(3, 6).map((seat) => {
-                          const status = getSeatStatus(seat);
-                          const passengerIndex = getPassengerForSeat(seat.seatNumber);
+                          const status = getSeatStatus(seat, isShowingOutbound);
+                          const passengerIndex = getPassengerForSeat(seat.seatNumber, isShowingOutbound);
                           
                           return (
                             <button
                               key={seat.id}
-                              onClick={() => handleSeatClick(seat)}
+                              onClick={() => handleSeatClick(seat, isShowingOutbound)}
                               disabled={status === 'booked'}
                               className={`w-12 h-12 rounded-lg font-bold text-white text-sm transition-all transform hover:scale-105 ${getSeatColor(status)} flex items-center justify-center relative`}
-                              title={`${seat.seatNumber} - ${status === 'booked' ? 'Dolu' : status === 'selected' ? 'Seçildi' : 'Uygun'}`}
+                              title={`${seat.seatNumber}`}
                             >
                               {seat.seatNumber.slice(-1)}
                               {passengerIndex !== null && (
@@ -289,7 +369,7 @@ const SeatSelectionPage = () => {
 
               <div className="space-y-3 mb-6">
                 {bookingData.passengers.map((passenger, index) => {
-                  const selectedSeat = selectedSeats[index];
+                  const selectedSeat = currentSelectedSeats[index];
                   
                   return (
                     <div
@@ -331,37 +411,57 @@ const SeatSelectionPage = () => {
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
                   <span>İlerleme</span>
                   <span className="font-bold">
-                    {Object.keys(selectedSeats).length} / {bookingData.passengerCount}
+                    {Object.keys(currentSelectedSeats).length} / {bookingData.passengerCount}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
                     className="bg-blue-600 h-3 rounded-full transition-all"
                     style={{
-                      width: `${(Object.keys(selectedSeats).length / bookingData.passengerCount) * 100}%`
+                      width: `${(Object.keys(currentSelectedSeats).length / bookingData.passengerCount) * 100}%`
                     }}
                   ></div>
                 </div>
               </div>
 
-              {/* Onayla Butonu */}
-              <button
-                onClick={handlePurchase}
-                disabled={Object.keys(selectedSeats).length !== bookingData.passengerCount || purchasing}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
-              >
-                {purchasing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    İşleniyor...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={24} />
-                    Satın Almayı Onayla
-                  </>
-                )}
-              </button>
+              {/* Onayla/İlerle Butonu */}
+              {isShowingOutbound ? (
+                <button
+                  onClick={handleConfirmOutbound}
+                  disabled={Object.keys(currentSelectedSeats).length !== bookingData.passengerCount}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+                >
+                  {isRoundTrip ? (
+                    <>
+                      Dönüş Koltukları Seçimine Geç
+                      <ArrowRight size={24} />
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={24} />
+                      Satın Almayı Onayla
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handlePurchase}
+                  disabled={Object.keys(currentSelectedSeats).length !== bookingData.passengerCount || purchasing}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3"
+                >
+                  {purchasing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      İşleniyor...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={24} />
+                      Satın Almayı Onayla
+                    </>
+                  )}
+                </button>
+              )}
 
             </div>
           </div>
@@ -373,7 +473,7 @@ const SeatSelectionPage = () => {
       {/* BAŞARI POPUP MODAL */}
       {showSuccessModal && purchaseResult && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 relative animate-in fade-in zoom-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 relative animate-in fade-in zoom-in max-h-[90vh] overflow-y-auto">
             
             {/* Başarı İkonu */}
             <div className="text-center mb-6">
@@ -403,6 +503,16 @@ const SeatSelectionPage = () => {
                 <p className="text-sm text-gray-600 mb-1">Uçuş Numarası</p>
                 <p className="font-bold text-gray-800">{purchaseResult.flightNumber}</p>
                 <p className="text-sm text-gray-600 mt-2">{purchaseResult.route}</p>
+                <div className="flex justify-between mt-3 text-sm">
+                  <div>
+                    <p className="text-gray-600">Kalkış</p>
+                    <p className="font-bold">{format(new Date(purchaseResult.departureTime), 'dd MMM HH:mm')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-gray-600">Varış</p>
+                    <p className="font-bold">{format(new Date(purchaseResult.arrivalTime), 'dd MMM HH:mm')}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -417,6 +527,9 @@ const SeatSelectionPage = () => {
                     <div>
                       <p className="font-bold text-gray-800">{ticket.passengerName}</p>
                       <p className="text-sm text-gray-600">Bilet #{ticket.ticketId}</p>
+                      {ticket.returnFlightNumber && (
+                        <p className="text-xs text-gray-500">Gidiş-Dönüş</p>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -429,10 +542,7 @@ const SeatSelectionPage = () => {
 
             {/* Kapat Butonu */}
             <button
-              onClick={() => {
-                setShowSuccessModal(false);
-                navigate('/');
-              }}
+              onClick={handleCloseSuccessModal}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all"
             >
               Ana Sayfaya Dön
