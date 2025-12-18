@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import flightSearchService from '../../services/flightSearchService';
-import { ArrowRight, Calendar, CheckCircle2, Plane, Percent } from 'lucide-react'; // Percent ikonu eklendi
+import { ArrowRight, Calendar, CheckCircle2, Plane, Edit2, ChevronRight, Percent } from 'lucide-react'; // Percent eklendi
 import { format, differenceInMinutes } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useBooking } from '../../context/BookingContext';
@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 const SearchResultsPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { selectDepartureFlight, selectReturnFlight } = useBooking();
+  const { bookingData, selectOutboundFlight, selectReturnFlight, resetOutboundFlight, resetReturnFlight } = useBooking();
 
   // URL'den parametreler
   const tripType = searchParams.get('tripType') || 'one-way';
@@ -21,19 +21,32 @@ const SearchResultsPage = () => {
 
   // State
   const [loading, setLoading] = useState(true);
-  const [currentStep, setCurrentStep] = useState('departure'); // 'departure' veya 'return'
+  const [currentStep, setCurrentStep] = useState('outbound'); // 'outbound' veya 'return'
 
   // Gidiş uçuşları
-  const [departureFlightData, setDepartureFlightData] = useState(null);
-  const [selectedDepartureDateTab, setSelectedDepartureDateTab] = useState('selected');
-  const [departureFlights, setDepartureFlights] = useState([]);
-  const [selectedDepartureFlight, setSelectedDepartureFlight] = useState(null);
+  const [outboundFlightData, setOutboundFlightData] = useState(null);
+  const [selectedOutboundDateTab, setSelectedOutboundDateTab] = useState('selected');
+  const [outboundFlights, setOutboundFlights] = useState([]);
 
   // Dönüş uçuşları
   const [returnFlightData, setReturnFlightData] = useState(null);
   const [selectedReturnDateTab, setSelectedReturnDateTab] = useState('selected');
   const [returnFlights, setReturnFlights] = useState([]);
-  const [selectedReturnFlight, setSelectedReturnFlight] = useState(null);
+
+  // Context'ten seçili uçuşları al
+  const selectedOutbound = bookingData.outboundFlight;
+  const selectedReturn = bookingData.returnFlight;
+
+  // Sayfa yüklendiğinde yönlendirme
+  useEffect(() => {
+    if (tripType === 'round-trip') {
+      if (selectedOutbound && !selectedReturn) {
+        setCurrentStep('return');
+      } else if (!selectedOutbound) {
+        setCurrentStep('outbound');
+      }
+    }
+  }, [tripType, selectedOutbound, selectedReturn]);
 
   // Uçuşları yükle
   useEffect(() => {
@@ -54,8 +67,8 @@ const SearchResultsPage = () => {
             returnDate
           );
 
-          setDepartureFlightData(result.departure);
-          setDepartureFlights(result.departure.selectedDate.data);
+          setOutboundFlightData(result.departure);
+          setOutboundFlights(result.departure.selectedDate.data);
 
           setReturnFlightData(result.return);
           setReturnFlights(result.return.selectedDate.data);
@@ -68,8 +81,8 @@ const SearchResultsPage = () => {
             false
           );
 
-          setDepartureFlightData(result);
-          setDepartureFlights(result.selectedDate.data);
+          setOutboundFlightData(result);
+          setOutboundFlights(result.selectedDate.data);
         }
       } catch (error) {
         console.error("API Error:", error);
@@ -82,19 +95,18 @@ const SearchResultsPage = () => {
     fetchFlights();
   }, [fromCode, toCode, departureDate, returnDate, tripType]);
 
-  // Gidiş tarih sekmesi değiştir
-  const handleDepartureDateTabClick = (tabKey) => {
-    setSelectedDepartureDateTab(tabKey);
-    if (tabKey === "prev" && departureFlightData?.prevDay) {
-      setDepartureFlights(departureFlightData.prevDay.data);
+  // ... (Tarih ve Tab fonksiyonları aynı kalıyor) ...
+  const handleOutboundDateTabClick = (tabKey) => {
+    setSelectedOutboundDateTab(tabKey);
+    if (tabKey === "prev" && outboundFlightData?.prevDay) {
+      setOutboundFlights(outboundFlightData.prevDay.data);
     } else if (tabKey === "selected") {
-      setDepartureFlights(departureFlightData.selectedDate.data);
+      setOutboundFlights(outboundFlightData.selectedDate.data);
     } else if (tabKey === "next") {
-      setDepartureFlights(departureFlightData.nextDay.data);
+      setOutboundFlights(outboundFlightData.nextDay.data);
     }
   };
 
-  // Dönüş tarih sekmesi değiştir
   const handleReturnDateTabClick = (tabKey) => {
     setSelectedReturnDateTab(tabKey);
     if (tabKey === "prev" && returnFlightData?.prevDay) {
@@ -117,32 +129,39 @@ const SearchResultsPage = () => {
     return `${hours}sa ${minutes}dk`;
   };
 
-  // Gidiş uçuşu seçildiğinde
-  const handleSelectDepartureFlight = (flight) => {
-    setSelectedDepartureFlight(flight);
-    selectDepartureFlight(flight);
-
+  const handleSelectOutboundFlight = (flight) => {
+    selectOutboundFlight(flight);
     if (tripType === 'one-way') {
-      // Tek yön ise direkt yolcu bilgilerine git
       navigate('/booking/passenger-info');
     } else {
-      // Gidiş-dönüş ise dönüş seçimine geç
       setCurrentStep('return');
       toast.success('Gidiş uçuşu seçildi! Şimdi dönüş uçuşunu seçin.');
     }
   };
 
-  // Dönüş uçuşu seçildiğinde
   const handleSelectReturnFlight = (flight) => {
-    setSelectedReturnFlight(flight);
     selectReturnFlight(flight);
     navigate('/booking/passenger-info');
   };
 
-  // --- FİYAT GÖSTERİM BİLEŞENİ (Helper) ---
+  const handleChangeOutbound = () => {
+    resetOutboundFlight();
+    setCurrentStep('outbound');
+    toast.info('Gidiş uçuşunu değiştirebilirsiniz.');
+  };
+
+  const handleChangeReturn = () => {
+    resetReturnFlight();
+    setCurrentStep('return');
+    toast.info('Dönüş uçuşunu değiştirebilirsiniz.');
+  };
+
+  // --- FİYAT GÖSTERİM BİLEŞENİ (Helper Component) ---
   const PriceDisplay = ({ currentPrice, discountPrice, size = "normal" }) => {
-    // discountPrice null değilse indirim var demektir.
-    if (discountPrice !== null && discountPrice !== undefined) {
+    // discountPrice null değilse ve 0'dan büyükse indirim var kabul et
+    const hasDiscount = discountPrice !== null && discountPrice !== undefined && discountPrice > 0;
+
+    if (hasDiscount) {
       return (
         <div className="flex flex-col items-end">
           {/* Eski Fiyat (Üstü Çizili) */}
@@ -152,20 +171,21 @@ const SearchResultsPage = () => {
           {/* Yeni Fiyat (İndirimli) */}
           <div className={`font-bold text-green-600 flex items-center gap-1 ${size === "large" ? "text-3xl" : "text-2xl"}`}>
              ${discountPrice.toFixed(2)}
-             {/* Opsiyonel: İndirim ikonu */}
+             {/* İsteğe bağlı indirim ikonu */}
              {size === "large" && <Percent size={20} className="animate-pulse" />}
           </div>
         </div>
       );
     }
 
-    // İndirim yoksa sadece normal fiyat
+    // İndirim yoksa sadece normal fiyat (Mavi)
     return (
       <div className={`font-bold text-blue-600 ${size === "large" ? "text-3xl" : "text-2xl"}`}>
         ${currentPrice.toFixed(2)}
       </div>
     );
   };
+  // --------------------------------------------------
 
   if (loading) {
     return (
@@ -178,86 +198,143 @@ const SearchResultsPage = () => {
     );
   }
 
-  // Hangi uçuşları göstereceğimizi belirle
-  const showingDeparture = currentStep === 'departure';
+  const showingOutbound = currentStep === 'outbound';
   const showingReturn = currentStep === 'return';
 
-  const currentFlightData = showingDeparture ? departureFlightData : returnFlightData;
-  const currentFlights = showingDeparture ? departureFlights : returnFlights;
-  const currentDateTab = showingDeparture ? selectedDepartureDateTab : selectedReturnDateTab;
-  const handleDateTabClick = showingDeparture ? handleDepartureDateTabClick : handleReturnDateTabClick;
-  const handleSelectFlight = showingDeparture ? handleSelectDepartureFlight : handleSelectReturnFlight;
+  const currentFlightData = showingOutbound ? outboundFlightData : returnFlightData;
+  const currentFlights = showingOutbound ? outboundFlights : returnFlights;
+  const currentDateTab = showingOutbound ? selectedOutboundDateTab : selectedReturnDateTab;
+  const handleDateTabClick = showingOutbound ? handleOutboundDateTabClick : handleReturnDateTabClick;
+  const handleSelectFlight = showingOutbound ? handleSelectOutboundFlight : handleSelectReturnFlight;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8">
       <div className="container mx-auto px-4 max-w-6xl">
 
-        {/* BAŞLIK VE İLERLEME */}
+        {/* BAŞLIK */}
         <div className="mb-6">
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
             {tripType === 'round-trip' ? 'Gidiş - Dönüş Uçuşları' : 'Uçuş Sonuçları'}
           </h2>
 
-          {/* Gidiş-Dönüş İlerleme Göstergesi */}
+          {/* Gidiş-Dönüş İlerleme ve Seçilen Uçuşlar */}
           {tripType === 'round-trip' && (
-            <div className="flex items-center gap-4 mt-4">
-              <div className={`flex items-center gap-2 ${showingDeparture ? 'text-blue-600' : 'text-green-600'}`}>
-                {showingDeparture ? (
-                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">1</div>
-                ) : (
-                  <CheckCircle2 className="text-green-600" size={32} />
-                )}
-                <div>
-                  <p className="font-bold">Gidiş Uçuşu</p>
-                  <p className="text-sm text-gray-600">{fromCode} → {toCode}</p>
+            <div className="space-y-4 mt-6">
+              
+              {/* Gidiş Uçuşu Durumu */}
+              <div className={`bg-white rounded-2xl shadow-lg border-2 p-6 transition-all ${
+                showingOutbound ? 'border-blue-500' : selectedOutbound ? 'border-green-500' : 'border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {selectedOutbound ? (
+                      <CheckCircle2 className="text-green-600 flex-shrink-0" size={32} />
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
+                        showingOutbound ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-600'
+                      }`}>
+                        1
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-bold text-gray-800 text-lg">Gidiş Uçuşu</p>
+                      <p className="text-sm text-gray-600">{fromCode} → {toCode}</p>
+                    </div>
+                  </div>
+
+                  {selectedOutbound ? (
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <div className="flex items-center gap-3 mb-1 justify-end">
+                          <span className="text-xl font-bold text-gray-800">
+                            {format(new Date(selectedOutbound.departureTime), "HH:mm")}
+                          </span>
+                          <ArrowRight className="text-gray-400" size={20} />
+                          <span className="text-xl font-bold text-gray-800">
+                            {format(new Date(selectedOutbound.arrivalTime), "HH:mm")}
+                          </span>
+                        </div>
+                        {/* Fiyat Gösterimi (Helper Component) */}
+                        <PriceDisplay 
+                          currentPrice={selectedOutbound.currentPrice} 
+                          discountPrice={selectedOutbound.discountPrice} 
+                          size="normal"
+                        />
+                      </div>
+                      <button
+                        onClick={handleChangeOutbound}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-medium transition flex items-center gap-2"
+                      >
+                        <Edit2 size={16} />
+                        Değiştir
+                      </button>
+                    </div>
+                  ) : showingOutbound ? (
+                    <span className="text-blue-600 font-medium">Seçim yapın</span>
+                  ) : null}
                 </div>
               </div>
 
-              <ArrowRight className="text-gray-400" size={24} />
+              {/* Dönüş Uçuşu Durumu */}
+              <div className={`bg-white rounded-2xl shadow-lg border-2 p-6 transition-all ${
+                showingReturn ? 'border-blue-500' : selectedReturn ? 'border-green-500' : 'border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {selectedReturn ? (
+                      <CheckCircle2 className="text-green-600 flex-shrink-0" size={32} />
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
+                        showingReturn ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-600'
+                      }`}>
+                        2
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-bold text-gray-800 text-lg">Dönüş Uçuşu</p>
+                      <p className="text-sm text-gray-600">{toCode} → {fromCode}</p>
+                    </div>
+                  </div>
 
-              <div className={`flex items-center gap-2 ${showingReturn ? 'text-blue-600' : 'text-gray-400'}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${showingReturn ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-600'}`}>
-                  2
-                </div>
-                <div>
-                  <p className="font-bold">Dönüş Uçuşu</p>
-                  <p className="text-sm text-gray-600">{toCode} → {fromCode}</p>
+                  {selectedReturn ? (
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <div className="flex items-center gap-3 mb-1 justify-end">
+                          <span className="text-xl font-bold text-gray-800">
+                            {format(new Date(selectedReturn.departureTime), "HH:mm")}
+                          </span>
+                          <ArrowRight className="text-gray-400" size={20} />
+                          <span className="text-xl font-bold text-gray-800">
+                            {format(new Date(selectedReturn.arrivalTime), "HH:mm")}
+                          </span>
+                        </div>
+                        {/* Fiyat Gösterimi (Helper Component) */}
+                        <PriceDisplay 
+                          currentPrice={selectedReturn.currentPrice} 
+                          discountPrice={selectedReturn.discountPrice} 
+                          size="normal"
+                        />
+                      </div>
+                      <button
+                        onClick={handleChangeReturn}
+                        disabled={!selectedReturn}
+                        className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-gray-700 px-4 py-2 rounded-xl font-medium transition flex items-center gap-2"
+                      >
+                        <Edit2 size={16} />
+                        Değiştir
+                      </button>
+                    </div>
+                  ) : showingReturn ? (
+                    <span className="text-blue-600 font-medium">Seçim yapın</span>
+                  ) : (
+                    <span className="text-gray-400 text-sm">Önce gidiş uçuşunu seçin</span>
+                  )}
                 </div>
               </div>
+
             </div>
           )}
         </div>
-
-        {/* Seçilen Gidiş Uçuşu Özeti (Dönüş seçerken göster) */}
-        {showingReturn && selectedDepartureFlight && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Seçilen Gidiş Uçuşu</p>
-                <div className="flex items-center gap-4">
-                  <span className="text-xl font-bold text-gray-800">
-                    {format(new Date(selectedDepartureFlight.departureTime), "HH:mm")}
-                  </span>
-                  <ArrowRight className="text-gray-400" size={20} />
-                  <span className="text-xl font-bold text-gray-800">
-                    {format(new Date(selectedDepartureFlight.arrivalTime), "HH:mm")}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {selectedDepartureFlight.departureAirport.city} → {selectedDepartureFlight.arrivalAirport.city}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                {/* Özet kısmında da fiyat kontrolü */}
-                <PriceDisplay 
-                  currentPrice={selectedDepartureFlight.currentPrice} 
-                  discountPrice={selectedDepartureFlight.discountPrice} 
-                  size="normal"
-                />
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* TARİH NAVİGASYONU */}
         {currentFlightData && (
@@ -380,19 +457,21 @@ const SearchResultsPage = () => {
                     </div>
                   </div>
 
-                  {/* FİYAT ALANI GÜNCELLENDİ */}
                   <div className="text-right mt-4 md:mt-0 md:ml-6 flex flex-col items-end gap-2">
+                    
+                    {/* Fiyat Gösterimi (Helper Component - Large Size) */}
                     <PriceDisplay 
                       currentPrice={flight.currentPrice} 
                       discountPrice={flight.discountPrice} 
                       size="large"
                     />
-                    
+
                     <button
                       onClick={() => handleSelectFlight(flight)}
-                      className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-200"
+                      className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-200 flex items-center gap-2"
                     >
                       Seç
+                      <ChevronRight size={20} />
                     </button>
                   </div>
                 </div>
