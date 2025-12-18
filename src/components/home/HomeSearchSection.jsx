@@ -8,7 +8,7 @@ import { useBooking } from '../../context/BookingContext';
 
 const HomeSearchSection = () => {
   const navigate = useNavigate();
-  const { updateBookingData } = useBooking();
+  const { setSearchCriteria } = useBooking();
   
   // --- STATE ---
   const [tripType, setTripType] = useState('one-way');
@@ -44,11 +44,19 @@ const HomeSearchSection = () => {
       return;
     }
 
-    // Yolcu sayısını context'e kaydet
-    updateBookingData({ passengerCount: passengers });
+    // Arama kriterlerini context'e kaydet
+    setSearchCriteria({
+      tripType: tripType,
+      departureAirportIataCode: fromAirport.iataCode,
+      arrivalAirportIataCode: toAirport.iataCode,
+      departureDate: departureDate,
+      returnDate: tripType === 'round-trip' ? returnDate : null,
+      passengerCount: passengers
+    });
 
     // URL parametrelerini oluştur
     const queryParams = new URLSearchParams({
+      tripType: tripType,
       departureDate,
       departureAirportIataCode: fromAirport.iataCode,
       arrivalAirportIataCode: toAirport.iataCode,
