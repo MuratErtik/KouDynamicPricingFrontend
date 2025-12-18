@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import flightSearchService from '../../services/flightSearchService';
-import { ArrowRight, Calendar, CheckCircle2, Plane } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle2, Plane, Percent } from 'lucide-react'; // Percent ikonu eklendi
 import { format, differenceInMinutes } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useBooking } from '../../context/BookingContext';
@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 const SearchResultsPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { bookingData, selectDepartureFlight, selectReturnFlight } = useBooking();
+  const { selectDepartureFlight, selectReturnFlight } = useBooking();
 
   // URL'den parametreler
   const tripType = searchParams.get('tripType') || 'one-way';
@@ -139,6 +139,34 @@ const SearchResultsPage = () => {
     navigate('/booking/passenger-info');
   };
 
+  // --- FİYAT GÖSTERİM BİLEŞENİ (Helper) ---
+  const PriceDisplay = ({ currentPrice, discountPrice, size = "normal" }) => {
+    // discountPrice null değilse indirim var demektir.
+    if (discountPrice !== null && discountPrice !== undefined) {
+      return (
+        <div className="flex flex-col items-end">
+          {/* Eski Fiyat (Üstü Çizili) */}
+          <span className={`text-gray-400 line-through decoration-red-500 decoration-1 font-medium ${size === "large" ? "text-lg" : "text-sm"}`}>
+            ${currentPrice.toFixed(2)}
+          </span>
+          {/* Yeni Fiyat (İndirimli) */}
+          <div className={`font-bold text-green-600 flex items-center gap-1 ${size === "large" ? "text-3xl" : "text-2xl"}`}>
+             ${discountPrice.toFixed(2)}
+             {/* Opsiyonel: İndirim ikonu */}
+             {size === "large" && <Percent size={20} className="animate-pulse" />}
+          </div>
+        </div>
+      );
+    }
+
+    // İndirim yoksa sadece normal fiyat
+    return (
+      <div className={`font-bold text-blue-600 ${size === "large" ? "text-3xl" : "text-2xl"}`}>
+        ${currentPrice.toFixed(2)}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -220,9 +248,12 @@ const SearchResultsPage = () => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-blue-600">
-                  ${selectedDepartureFlight.currentPrice.toFixed(2)}
-                </p>
+                {/* Özet kısmında da fiyat kontrolü */}
+                <PriceDisplay 
+                  currentPrice={selectedDepartureFlight.currentPrice} 
+                  discountPrice={selectedDepartureFlight.discountPrice} 
+                  size="normal"
+                />
               </div>
             </div>
           </div>
@@ -349,10 +380,14 @@ const SearchResultsPage = () => {
                     </div>
                   </div>
 
-                  <div className="text-right mt-4 md:mt-0 md:ml-6">
-                    <div className="text-3xl font-bold text-blue-600 mb-2">
-                      ${flight.currentPrice.toFixed(2)}
-                    </div>
+                  {/* FİYAT ALANI GÜNCELLENDİ */}
+                  <div className="text-right mt-4 md:mt-0 md:ml-6 flex flex-col items-end gap-2">
+                    <PriceDisplay 
+                      currentPrice={flight.currentPrice} 
+                      discountPrice={flight.discountPrice} 
+                      size="large"
+                    />
+                    
                     <button
                       onClick={() => handleSelectFlight(flight)}
                       className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg hover:shadow-blue-200"
