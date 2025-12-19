@@ -134,7 +134,7 @@ const PnrDetailsPage = () => {
 
               <div>
                 <p className="text-xs text-gray-400 uppercase font-bold mb-1">Uçuş No</p>
-                <p className="font-mono font-bold text-gray-800 text-lg">{currentTicket.flightNumber}</p>
+                <p className="font-mono font-bold text-gray-800 text-sm">{currentTicket.flightNumber}</p>
               </div>
 
               <div>
