@@ -9,6 +9,14 @@ const ticketService = {
       identityNumber: identityNumber
     });
     return response.data;
+  },
+
+  cancelTicket: async (pnr, identityNumber) => {
+    const response = await api.post('/public/tickets/cancel', {
+      pnr: pnr,
+      identityNumber: identityNumber
+    });
+    return response.data;
   }
 };
 
