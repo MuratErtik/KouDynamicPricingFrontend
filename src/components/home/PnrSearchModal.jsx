@@ -28,19 +28,26 @@ const PnrSearchModal = ({ isOpen, onClose }) => {
     try {
       const result = await ticketService.searchByPnr(pnr.toUpperCase(), identityNumber);
       
-      // --- DÜZELTME BURADA: Başarılı işlem sonrası state'leri sıfırla ---
+      // Formu temizle (Bir sonraki açılış için)
       setPnr('');
       setIdentityNumber('');
-      // ------------------------------------------------------------------
 
-      // Modalı kapat ve detay sayfasına yönlendir
+      // Modalı kapat
       onClose();
-      navigate('/pnr-details', { state: { ticketData: result } });
+
+   
+      navigate('/pnr-details', { 
+        state: { 
+          ticketData: result,
+          identityNumber: identityNumber ,// <--- EKLENEN KISIM
+          searchedPnr: pnr // <--- BU SATIRI EKLE (Değişken scope'undan gelen ham pnr)
+        } 
+      });
       
     } catch (error) {
       console.error(error);
       toast.error('Bilet bulunamadı veya bilgiler hatalı.');
-      // Hata durumunda inputları temizlemiyoruz ki kullanıcı düzeltebilsin.
+      // Hata durumunda inputları temizlemiyoruz, kullanıcı düzeltebilsin diye.
     } finally {
       setLoading(false);
     }
