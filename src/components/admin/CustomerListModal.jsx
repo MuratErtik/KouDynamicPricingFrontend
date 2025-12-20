@@ -1,13 +1,26 @@
 import React from 'react';
-import { X, Users, Mail, Phone, Calendar, Armchair, CreditCard, Ticket } from 'lucide-react';
+import { X, Users, Mail, Phone, Calendar, Armchair, CreditCard, Ticket, Ban } from 'lucide-react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 
 const CustomerListModal = ({ isOpen, onClose, customers, flightNumber }) => {
   if (!isOpen) return null;
 
-  // Toplam Ciro Hesaplama
-  const totalRevenue = customers ? customers.reduce((acc, curr) => acc + curr.soldPrice, 0) : 0;
+  // Aktif yolcular (iptal edilmemiş)
+  // Backend'den is_cancelled veya isCancelled gelebilir, her ikisini de kontrol et
+  const activeCustomers = customers ? customers.filter(c => !(c.isCancelled || c.is_cancelled)) : [];
+  
+  // Toplam yolcu sayısı
+  const totalCustomers = customers?.length || 0;
+  
+  // Aktif yolcu sayısı
+  const activeCustomerCount = activeCustomers.length;
+
+  // Toplam Ciro Hesaplama (sadece aktif biletler)
+  const totalRevenue = activeCustomers.reduce((acc, curr) => acc + curr.soldPrice, 0);
+
+  // Helper: iptal durumunu kontrol et (hem snake_case hem camelCase)
+  const isCancelled = (item) => item.isCancelled || item.is_cancelled;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -39,8 +52,11 @@ const CustomerListModal = ({ isOpen, onClose, customers, flightNumber }) => {
               <Users size={24} />
             </div>
             <div>
-              <p className="text-xs text-gray-400 uppercase font-bold">Toplam Yolcu</p>
-              <p className="text-2xl font-bold text-gray-800">{customers?.length || 0}</p>
+              <p className="text-xs text-gray-400 uppercase font-bold">Aktif Yolcu</p>
+              <p className="text-2xl font-bold text-gray-800">
+                {activeCustomerCount}
+                <span className="text-sm text-gray-400 font-normal ml-2">/ {totalCustomers}</span>
+              </p>
             </div>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex-1 flex items-center gap-4">
@@ -65,6 +81,7 @@ const CustomerListModal = ({ isOpen, onClose, customers, flightNumber }) => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                 <tr>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Durum</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">PNR</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Yolcu Bilgileri</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">İletişim</th>
@@ -75,13 +92,41 @@ const CustomerListModal = ({ isOpen, onClose, customers, flightNumber }) => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {customers.map((item) => (
-                  <tr key={item.id} className="hover:bg-purple-50/50 transition-colors group">
+                  <tr 
+                    key={item.id} 
+                    className={`transition-colors group ${
+                      isCancelled(item)
+                        ? 'bg-red-50 hover:bg-red-100' 
+                        : 'hover:bg-purple-50/50'
+                    }`}
+                  >
                     
+                    {/* DURUM */}
+                    <td className="p-4 align-middle">
+                      {isCancelled(item) ? (
+                        <div className="flex items-center gap-2">
+                          <div className="bg-red-500 p-1.5 rounded-full">
+                            <Ban size={16} className="text-white" />
+                          </div>
+                          <span className="text-xs font-bold text-red-700 uppercase">İptal</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="bg-green-500 w-3 h-3 rounded-full"></div>
+                          <span className="text-xs font-bold text-green-700 uppercase">Aktif</span>
+                        </div>
+                      )}
+                    </td>
+
                     {/* PNR */}
                     <td className="p-4 align-middle">
                       <div className="flex items-center gap-2">
-                        <Ticket size={16} className="text-purple-400" />
-                        <span className="font-mono font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                        <Ticket size={16} className={isCancelled(item) ? 'text-red-400' : 'text-purple-400'} />
+                        <span className={`font-mono font-bold px-2 py-1 rounded border ${
+                          isCancelled(item)
+                            ? 'text-red-700 bg-red-100 border-red-200' 
+                            : 'text-gray-700 bg-gray-100 border-gray-200'
+                        }`}>
                           {item.pnr}
                         </span>
                       </div>
@@ -90,10 +135,12 @@ const CustomerListModal = ({ isOpen, onClose, customers, flightNumber }) => {
                     {/* YOLCU ADI */}
                     <td className="p-4 align-middle">
                       <div>
-                        <p className="font-bold text-gray-800 text-sm">{item.passenger.firstName} {item.passenger.lastName}</p>
+                        <p className={`font-bold text-sm ${isCancelled(item) ? 'text-red-700 line-through' : 'text-gray-800'}`}>
+                          {item.passenger.firstName} {item.passenger.lastName}
+                        </p>
                         <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                            <span className="uppercase">Doğum:</span> 
-                            {format(new Date(item.passenger.birthDate), 'dd.MM.yyyy')}
+                          <span className="uppercase">Doğum:</span> 
+                          {format(new Date(item.passenger.birthDate), 'dd.MM.yyyy')}
                         </p>
                       </div>
                     </td>
@@ -114,10 +161,12 @@ const CustomerListModal = ({ isOpen, onClose, customers, flightNumber }) => {
 
                     {/* KOLTUK */}
                     <td className="p-4 align-middle">
-                       <div className="flex items-center gap-2">
-                          <Armchair size={16} className="text-blue-500" />
-                          <span className="font-bold text-gray-700">{item.seat.seatNumber}</span>
-                       </div>
+                      <div className="flex items-center gap-2">
+                        <Armchair size={16} className={isCancelled(item) ? 'text-red-500' : 'text-blue-500'} />
+                        <span className={`font-bold ${isCancelled(item) ? 'text-red-700 line-through' : 'text-gray-700'}`}>
+                          {item.seat.seatNumber}
+                        </span>
+                      </div>
                     </td>
 
                     {/* TARİH */}
@@ -130,9 +179,15 @@ const CustomerListModal = ({ isOpen, onClose, customers, flightNumber }) => {
 
                     {/* TUTAR */}
                     <td className="p-4 align-middle text-right">
-                      <span className="font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full text-sm">
-                        ${item.soldPrice.toFixed(2)}
-                      </span>
+                      {isCancelled(item) ? (
+                        <span className="font-bold text-red-600 bg-red-100 px-3 py-1 rounded-full text-sm line-through">
+                          ${item.soldPrice.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full text-sm">
+                          ${item.soldPrice.toFixed(2)}
+                        </span>
+                      )}
                     </td>
 
                   </tr>
